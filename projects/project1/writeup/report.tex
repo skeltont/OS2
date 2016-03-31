@@ -1,0 +1,147 @@
+\documentclass[10pt,draftclsnofoot,onecolumn]{IEEEtran}
+
+\usepackage{setspace}
+% \usepackage{xcolor}
+% \usepackage{caption}
+\usepackage{listings}
+
+\ifCLASSINFOpdf
+  \usepackage[pdftex]{graphicx}
+  \graphicspath{static/}
+  \DeclareGraphicsExtensions{.pdf,.jpeg,.png}
+\fi
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+% listings options
+\lstset{frame=lrbt,xleftmargin=\fboxsep,xrightmargin=-\fboxsep}
+
+
+\begin{document}
+
+\pagenumbering{gobble}
+\singlespacing
+\title{Project 1}
+
+\author{Ty~Skelton}
+
+
+% The paper headers
+\markboth{CS 444}%
+{Spring 2016}
+
+% make the title area
+\maketitle
+
+% As a general rule, do not put math, special symbols or citations
+% in the abstract or keywords.
+\begin{abstract}
+The first project of Operating Systems 2.
+This assignment is meant to introduce us to working with the the linux kernel and writing concurrent programs in C.
+
+
+\end{abstract}
+\IEEEpeerreviewmaketitle
+
+\newpage
+\pagenumbering{arabic}
+
+\section{Booting the Kernel on the VM}
+
+\subsection{Log of Commands}
+
+\subsubsection{}
+Acquiring a local copy of the Kernel by running
+\begin{lstlisting}[language=bash]
+  $ git clone git://git.yoctoproject.org/linux-yocto-3.14
+\end{lstlisting}
+
+\subsubsection{}
+Copying over all the necessary files into the root of my linux tree:
+\begin{lstlisting}[language=bash]
+  $ cp /scratch/spring2015/files/config-3.14.26-yocto-qemu ./.config
+  $ cp /scratch/spring2015/files/bzImage-qemux86.bin ./
+  $ cp /scratch/spring2015/files/core-image-lsb-sdk-qemux86.ext3 ./
+\end{lstlisting}
+
+\subsubsection{}
+Building the kernel:
+\begin{lstlisting}[language=bash]
+  $ make -j4 all
+\end{lstlisting}
+
+\subsubsection{}
+Writing a run script:
+\begin{lstlisting}[language=bash]
+  #!/bin/bash
+
+  source /scratch/opt/environment-setup-i586-poky-linux
+
+  qemu-system-i386 -gdb tcp::5618 -S -nographic -kernel bzImage-qemux86.bin \
+  -drive file=core-image-lsb-sdk-qemux86.ext3,if=virtio \
+  -enable-kvm -net none -usb -localtime --no-reboot \
+  --append "root=/dev/vda rw console=ttyS0 debug"
+\end{lstlisting}
+
+\subsubsection{}
+Running the script for the first time:
+\begin{lstlisting}[language=bash]
+  $ chmod u+x run
+  $ ./run
+\end{lstlisting}
+
+\subsubsection{}
+Creating the gdb initializer script:
+\begin{lstlisting}[language=bash]
+  target remote :5618
+  symbol-file linux-yocto-3.14/vmlinux
+\end{lstlisting}
+
+\subsubsection{}
+Connecting gdb from another shell:
+\begin{lstlisting}[language=bash]
+  $ gdb
+\end{lstlisting}
+
+\subsubsection{}
+After typing continue in the gdb instance, I was able to successfully login with the credentials of root.
+
+\subsection{Qemu CLI Flags}
+\textit{-gdb tcp::5618}
+This flag will tell Qemu to open a gdb server on the following device.
+We specify to a reserved tcp port.
+
+\textit{-S}
+This flag instructs Qemu to not start the CPU at start up and to wait for a continue from the device monitor.
+
+\textit{-nographic}
+Normally Qemu displays output to VGA.
+With this flag it will bypass that entirely and spin up a headless command line application.
+
+\textit{-kernel bzImage-qemux86.bin}
+Specifies the particular kernel to use.
+
+\textit{-drive file=core-image-lsb-sdk-qemux86.ext3,if=virtio}
+This flag specifies the drive to use, with some following options.
+The file option defines a disk image and the if option defines the type of interface the device is connected to.
+
+\textit{-enable-kvm}
+This flag enables full KVM (Kernel-based Virtual Machine) support.
+
+\textit{-net none}
+Instructs the VM that no network devices should be configured.
+
+\textit{-usb}
+Enables the USB drivers.
+
+\textit{-localtime}
+Sets the time to the localtime of the calling machine.
+
+\textit{--no-reboot}
+Exits rather than rebooting.
+
+\textit{--append "root=/dev/vda rw console=ttyS0 debug"}
+Sends command line arguments to the kernel.
+
+\end{document}

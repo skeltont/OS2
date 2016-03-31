@@ -34,6 +34,9 @@ modules.builtin
 *.patch
 *.gcno
 
+# Kernel
+core-image-lsb-sdk-qemux86.ext3
+
 #
 # Top-level generic files
 #

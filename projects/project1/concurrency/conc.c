@@ -1,0 +1,108 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+#include "mt19937ar.c"
+
+#define RDRAND_MASK    0x40000000
+
+struct object {
+  int value;
+  int sleeptime;
+};
+
+struct buffer {
+  struct object buf[32];
+  pthread_mutex_t bufflock;
+  int size;
+};
+
+int randNum(int num1, int num2) {
+  int r, res, check;
+
+  asm("sub %%ecx, %%ecx; cpuid;" : "=c" (check));
+  if (0 == (check & RDRAND_MASK)) {
+    printf("rdrand not supported\n");
+    res = genrand_int32();
+  } else {
+    printf("rdrand supported\n");
+    asm("rdrand %0;" : "=r" (r));
+    res = (abs(r) % num1) + num2;
+  }
+  return res;
+}
+
+
+void* producerProc(void *p) {
+  struct buffer *b = (struct buffer*)p;
+  struct object o;
+  int psleep = 0;
+
+  while (1) {
+    // make sure the buffer isn't full.
+    if(b->size != 32) {
+      o.value = randNum(1000, 0);
+      o.sleeptime = randNum(7, 2);
+
+      // lock the buffer so producer has control.
+      pthread_mutex_lock(&b->bufflock);
+
+      // write object produced to shared buffer.
+      b->buf[b->size] = o;
+      b->size = b->size + 1;
+      printf("Produced\tvalue: %d\ttime: %d\tbuf size: %d\n", o.value, o.sleeptime, b->size);
+
+      // release buffer lock for the consumer.
+      pthread_mutex_unlock(&b->bufflock);
+
+      // tell producer to sleep for 3 - 7 seconds.
+      psleep = randNum(5, 3);
+      sleep(psleep);
+    } else {
+      usleep(1);
+    }
+  }
+  pthread_exit(0);
+}
+
+void* consumerProc(void *p) {
+  struct buffer *b = (struct buffer*)p;
+  struct object o;
+
+  while (1) {
+    if(b->size > 0) {
+      pthread_mutex_lock(&b->bufflock);
+
+      b->size = b->size - 1;
+      o = b->buf[b->size];
+      printf("Consumed\tvalue: %d\ttime: %d\tbuf size: %d\n", o.value, o.sleeptime, b->size);
+
+      // release buffer object
+      pthread_mutex_unlock(&b->bufflock);
+
+      // tell consumer to sleep for however long the consumed object says so.
+      sleep(o.sleeptime);
+    } else {
+      usleep(1);
+    }
+  }
+  pthread_exit(0);
+}
+
+int main(int argc, char **argv) {
+  pthread_t producer, consumer;
+  struct buffer b = {
+    .bufflock = PTHREAD_MUTEX_INITIALIZER,
+    .size = 0
+  };
+
+  pthread_create(&producer, NULL, producerProc, (void*)&b);
+  pthread_create(&consumer, NULL, consumerProc, (void*)&b);
+
+  pthread_join(producer, NULL);
+  pthread_join(consumer, NULL);
+
+  pthread_mutex_destroy(&b.bufflock);
+
+  return 0;
+}

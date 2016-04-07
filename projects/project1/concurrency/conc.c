@@ -4,9 +4,9 @@
 #include <pthread.h>
 #include "mt19937ar.c"
 
-#define RDRAND_MASK    0x40000000
 #define KGRN  "\x1B[32m"
 #define KRED  "\x1B[31m"
+#define KWHT  "\x1B[37m"
 
 struct object {
   int value;
@@ -19,25 +19,32 @@ struct buffer {
   int size;
 };
 
+int rdrand_cap;
+
 int randNum(int num1, int num2) {
-  //int r, res, check;
-  int check, res;
+  int res;
   unsigned long r;
 
-  //asm ("sub %%ecx, %%ecx; cpuid;" : "=c" (check));
-  //if (0 == (check & RDRAND_MASK)) {
-  asm ("sub %%ecx, %%ecx; cpuid;" : "=c" (check));
-  if ( 0 == (check & (1 < 29)) ) {
-    //printf("rdrand not supported\n");
+  if (rdrand_cap == 1) {
     init_genrand(time(NULL));
     r = genrand_int32();
     res = (r % num1) + num2;
   } else {
-    //printf("rdrand supported\n");
     asm("rdrand %0;" : "=r" (r));
     res = (r % num1) + num2;
   }
   return res;
+}
+
+int check_rdrand() {
+  int check;
+  asm ("sub %%ecx, %%ecx; cpuid;" : "=c" (check));
+  if ( 0 == (check & (1 < 29)) ) {
+    printf("rdrand not supported\n");
+    return 1;
+  }
+  printf("rdrand supported\n");
+  return 0;
 }
 
 
@@ -61,7 +68,7 @@ void* producerProc(void *p) {
       // write object produced to shared buffer.
       b->buf[b->size] = o;
       b->size = b->size + 1;
-      printf("%sProduced\tvalue: %d\ttime: %d\tsleeping for: %d\tbuf size: %d\n",KGRN, o.value, o.sleeptime, psleep, b->size);
+      printf("%sProduced\tvalue: %d\ttime: %d\tsleeping for: %d\tbuf size: %d\n%s",KGRN, o.value, o.sleeptime, psleep, b->size, KWHT);
 
       // release buffer lock for the consumer.
       pthread_mutex_unlock(&b->bufflock);
@@ -84,7 +91,7 @@ void* consumerProc(void *p) {
 
       b->size = b->size - 1;
       o = b->buf[b->size];
-      printf("%sConsumed\tvalue: %d\ttime: %d\tsleeping for: %d\tbuf size: %d\n",KRED, o.value, o.sleeptime, o.sleeptime, b->size);
+      printf("%sConsumed\tvalue: %d\ttime: %d\tsleeping for: %d\tbuf size: %d\n%s",KRED, o.value, o.sleeptime, o.sleeptime, b->size, KWHT);
 
       // release buffer object
       pthread_mutex_unlock(&b->bufflock);
@@ -104,6 +111,8 @@ int main(int argc, char **argv) {
     .bufflock = PTHREAD_MUTEX_INITIALIZER,
     .size = 0
   };
+
+  rdrand_cap = check_rdrand();
 
   pthread_create(&producer, NULL, producerProc, (void*)&b);
   pthread_create(&consumer, NULL, consumerProc, (void*)&b);

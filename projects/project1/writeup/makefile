@@ -8,4 +8,4 @@ all:
 	rm report.dvi
 	rm report.log
 	rm report.ps
-	open report.pdf
+	#open report.pdf

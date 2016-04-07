@@ -18,14 +18,20 @@ struct buffer {
 };
 
 int randNum(int num1, int num2) {
-  int r, res, check;
+  //int r, res, check;
+  int check, res;
+  unsigned long r;
 
-  asm("sub %%ecx, %%ecx; cpuid;" : "=c" (check));
-  if (0 == (check & RDRAND_MASK)) {
-    printf("rdrand not supported\n");
-    res = genrand_int32();
+  //asm ("sub %%ecx, %%ecx; cpuid;" : "=c" (check));
+  //if (0 == (check & RDRAND_MASK)) {
+  asm ("sub %%ecx, %%ecx; cpuid;" : "=c" (check));
+  if ( 0 == (check & (1 < 29)) ) {
+    //printf("rdrand not supported\n");
+    init_genrand(time(NULL));
+    r = genrand_int32();
+    res = (r % num1) + num2;
   } else {
-    printf("rdrand supported\n");
+    //printf("rdrand supported\n");
     asm("rdrand %0;" : "=r" (r));
     res = (abs(r) % num1) + num2;
   }

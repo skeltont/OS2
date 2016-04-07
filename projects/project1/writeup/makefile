@@ -9,3 +9,9 @@ all:
 	rm report.log
 	rm report.ps
 	#open report.pdf
+
+clean:
+	rm report.aux
+	rm report.dvi
+	rm report.log
+	rm report.ps

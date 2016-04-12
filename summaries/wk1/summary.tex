@@ -1,0 +1,49 @@
+\documentclass[10pt,draftclsnofoot,onecolumn]{IEEEtran}
+
+\usepackage{setspace}
+% \usepackage{xcolor}
+% \usepackage{caption}
+\usepackage{listings}
+
+\ifCLASSINFOpdf
+  \usepackage[pdftex]{graphicx}
+  \graphicspath{static/}
+  \DeclareGraphicsExtensions{.pdf,.jpeg,.png}
+\fi
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+% listings options
+\lstset{frame=lrbt,xleftmargin=\fboxsep,xrightmargin=-\fboxsep}
+
+
+\begin{document}
+
+\pagenumbering{gobble}
+\singlespacing
+\title{Weekly Summary 1}
+
+\author{Ty~Skelton}
+
+
+% The paper headers
+\markboth{CS 444}%
+{Spring 2016}
+
+% make the title area
+\maketitle
+\IEEEpeerreviewmaketitle
+
+% 1) In a single coherent sentence give the following:
+%   i)   name of the author, title of the work, date in parenthesis;
+%   ii)  a rhetorically accurate verb (such as "assert," "argue," "deny," "refute," "prove," "disprove," "explain," etc.);
+%   iii) a that clause containing the major claim (thesis statement) of the work.
+Robert Love, "Linux Kernel Development" (June 2010), shepherds us through the history of Unix and through approaching the intimidating process of developing in the Linux Kernel.
+% 2) In a single coherent sentence give an explanation of how the author develops and supports the major claim (thesis statement).
+He is able to do so by discussing critical points in the history of the Linux Kernel and by using explicit examples of commands and their corresponding definitions to build the Kernel locally.
+% 3) In a single coherent sentence give a statement of the author's purpose, followed by an "in order" phrase.
+Love explores major points in Linux history and details how to get started with it's development in order to gain the interest of the reader and inspire them to get involved with the software and community.
+% 4) In a single coherent sentence give a description of the intended audience and/or the relationship the author establishes with the audience.
+The intended audience for this work has been explicitly described as Linux developers and users who are interested in understanding the Linux Kernel, whom which Love approaches in a teacher/student context.
+\end{document}

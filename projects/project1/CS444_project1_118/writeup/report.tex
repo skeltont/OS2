@@ -1,0 +1,193 @@
+\documentclass[10pt,draftclsnofoot,onecolumn]{IEEEtran}
+
+\usepackage{setspace}
+% \usepackage{xcolor}
+% \usepackage{caption}
+\usepackage{listings}
+
+\ifCLASSINFOpdf
+  \usepackage[pdftex]{graphicx}
+  \graphicspath{static/}
+  \DeclareGraphicsExtensions{.pdf,.jpeg,.png}
+\fi
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+% listings options
+\lstset{frame=lrbt,xleftmargin=\fboxsep,xrightmargin=-\fboxsep}
+
+
+\begin{document}
+
+\pagenumbering{gobble}
+\singlespacing
+\title{Project 1}
+
+\author{Ty~Skelton}
+
+
+% The paper headers
+\markboth{CS 444}%
+{Spring 2016}
+
+% make the title area
+\maketitle
+
+% As a general rule, do not put math, special symbols or citations
+% in the abstract or keywords.
+\begin{abstract}
+The first project of Operating Systems 2.
+This assignment is meant to introduce us to working with the the linux kernel and writing concurrent programs in C.
+The process of building the kernel to loading it on the VM connected to the debugger will be explained, along with a write-up of a concurrency programming assignment.
+The concurrency programming assignment solves the producer-consumer problem in C.
+This assignment will lay the ground work for the rest of the class. 
+
+
+\end{abstract}
+\IEEEpeerreviewmaketitle
+
+\newpage
+\pagenumbering{arabic}
+
+\section{Booting the Kernel on the VM}
+
+\subsection{Log of Commands}
+
+\subsubsection{}
+Acquiring a local copy of the Kernel by running
+\begin{lstlisting}[language=bash]
+  $ git clone git://git.yoctoproject.org/linux-yocto-3.14
+\end{lstlisting}
+
+\subsubsection{}
+Copying over all the necessary files into the root of my linux tree:
+\begin{lstlisting}[language=bash]
+  $ cp /scratch/spring2015/files/config-3.14.26-yocto-qemu ./.config
+  $ cp /scratch/spring2015/files/bzImage-qemux86.bin ./
+  $ cp /scratch/spring2015/files/core-image-lsb-sdk-qemux86.ext3 ./
+\end{lstlisting}
+
+\subsubsection{}
+Building the kernel:
+\begin{lstlisting}[language=bash]
+  $ make -j4 all
+\end{lstlisting}
+
+\subsubsection{}
+Writing a run script:
+\begin{lstlisting}[language=bash]
+  #!/bin/bash
+
+  source /scratch/opt/environment-setup-i586-poky-linux
+
+  qemu-system-i386 -gdb tcp::5618 -S -nographic -kernel bzImage-qemux86.bin \
+  -drive file=core-image-lsb-sdk-qemux86.ext3,if=virtio \
+  -enable-kvm -net none -usb -localtime --no-reboot \
+  --append "root=/dev/vda rw console=ttyS0 debug"
+\end{lstlisting}
+
+\subsubsection{}
+Running the script for the first time:
+\begin{lstlisting}[language=bash]
+  $ chmod u+x run
+  $ ./run
+\end{lstlisting}
+
+\subsubsection{}
+Creating the gdb initializer script:
+\begin{lstlisting}[language=bash]
+  target remote :5618
+  symbol-file linux-yocto-3.14/vmlinux
+\end{lstlisting}
+
+\subsubsection{}
+Connecting gdb from another shell:
+\begin{lstlisting}[language=bash]
+  $ gdb
+\end{lstlisting}
+
+\subsubsection{}
+After typing continue in the gdb instance, I was able to successfully login with the credentials of root.
+
+\subsection{Qemu CLI Flags}
+\textit{-gdb tcp::5618}
+This flag will tell Qemu to open a gdb server on the following device.
+We specify to a reserved tcp port.
+
+\textit{-S}
+This flag instructs Qemu to not start the CPU at start up and to wait for a continue from the device monitor.
+
+\textit{-nographic}
+Normally Qemu displays output to VGA.
+With this flag it will bypass that entirely and spin up a headless command line application.
+
+\textit{-kernel bzImage-qemux86.bin}
+Specifies the particular kernel to use.
+
+\textit{-drive file=core-image-lsb-sdk-qemux86.ext3,if=virtio}
+This flag specifies the drive to use, with some following options.
+The file option defines a disk image and the if option defines the type of interface the device is connected to.
+
+\textit{-enable-kvm}
+This flag enables full KVM (Kernel-based Virtual Machine) support.
+
+\textit{-net none}
+Instructs the VM that no network devices should be configured.
+
+\textit{-usb}
+Enables the USB drivers.
+
+\textit{-localtime}
+Sets the time to the localtime of the calling machine.
+
+\textit{--no-reboot}
+Exits rather than rebooting.
+
+\textit{--append "root=/dev/vda rw console=ttyS0 debug"}
+Sends command line arguments to the kernel.
+
+\subsection{Concurrency}
+\subsubsection{Main Point of Assignment}
+The main point of this assignment was to refresh our skills in C and introduce basic concepts of concurrent programming.
+Having both threads running with opposite purposes operating on a shared resource forces the programmer to start thinking with such a mindset.
+As Kevin hinted at in lecture, down the line we'll have more challenging assignments both in and out of class that are focused on concurrency in design.
+
+\subsubsection{Approach}
+My approach for this assignment was fairly simple.
+As a general practice for approaching programming assignments I like to lay the foundation/pseudo code out and then develop discrete chunks.
+For a clean start, I initially set up pthreads and got both my 'consumer' and 'producer' functions to run simultaneously and print to stdout.
+After making sure my threads were operating correctly, I then introduced the shared buffer and the mutex lock stored in a struct.
+
+It was semi-challenging to make sure the producer wouldn't go over the size limit and the consumer wouldn't try to pop until it was time.
+After fixing a few bugs, I ironed out the shared resource for the two threads and turned my sights onto the in-line assembly code.
+The in-line assembly was for checking the cpuid output for the 30th bit set in the ecx register, which told the program whether or not it could run the rdrand instruction.
+If it could, then it would execute more assembly, which made use of the instruction and then generated a random number within the confines of the modulus operation.
+
+\subsubsection{Ensuring solution was correct}
+I was able to make sure my solution was correct through a couple different methods.
+Firstly, I tested the sleep times supplied to both the producer and consumer threads.
+This meant I would crank up the speed on each one individually to see how my program handled the heightened activity.
+When the consumer slept for 0 seconds it would quickly pop off whatever the producer had just supplied to the shared buffer.
+Conversely, when the producer slept for 0 seconds it would fill the buffer to the max of 32 items and then patiently block until the Consumer was able to pop the top item.
+
+Outside of increasing the stress levels of the program I did a few other minor tests.
+Since I prefer to develop locally, I had to test my code on os-class.
+This ended up being semi necessary, because I needed to check for whether or not my cpu could use RDRAND should pass on my workstation and fail on os-class.
+I also kept tabs on my program by using extensive print statements to stdout that would let me make sure the program acted as expected.
+
+
+\subsubsection{What was learned}
+Coming into this class I didn't have a very strong understanding of concurrency or the tools that made it possible (e.g. pthreads).
+This assignment helped me refresh some of my lost knowledge from operating systems 1, taught me about concurrency, and helped me gain better insight on how the class will go as a whole.
+Outside of the concurrency assignment, building the Linux kernel was also very helpful.
+At first the lengthy commands and complex set up served to do little more than intimidate me, but after being required to describe the flags and the steps it ended being demystified greatly.
+
+
+\subsection{Version Control Log}
+\input{changelog.tex}
+\subsection{Work Log}
+\input{worklog.tex}
+
+
+\end{document}

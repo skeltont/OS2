@@ -2,7 +2,7 @@ all:
 	gcc -Wall -pthread conc.c -lpthread -o conc
 
 clean:
-	rm -f conc
+	rm conc
 
-default:
+default: 
 	gcc -Wall -pthread conc.c -lpthread -o conc

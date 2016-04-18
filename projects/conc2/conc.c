@@ -1,3 +1,39 @@
+/*
+  Author: Ty Skelton
+  Class: CS444 - Operating Systems 2
+  Assignment: Concurrency 2
+  Solution:
+      My solution for the dining philosophers problem was to introduce some kind
+    of conductor or "scheduler". This entity has local access to all of the
+    forks on the table, pointers to all 5 of the philosophers, and a running
+    "highest priority" that it checks to make sure philosophers do not starve.
+      The philosophers each have a relevant name, indicators for their
+    corresponding forks, an enum for the 4 potential statuses they could take
+    along their dining experience, and a priority value that increments if
+    they've been waiting for a turn to use the forks.
+      I first loop five times to initialize all of the philosophers and send
+    them on their way in their own threads. As I'm doing this, I'm also
+    initializing the conductor struct. Each philosopher starts to
+    "philosophize" by initially thinking for a time between 1-20 seconds and
+    when they're ready to eat they tell the conductor they announce that they
+    are hungry and wait until a fork is available. Once they get the forks they
+    need they eat for 2-9 seconds announce that they're done, and allows the
+    conductor to come take the forks.
+      The conductor is constantly checking each philospher for a change of
+    state. It only acts if they're hungry or if they're done. Thinking and
+    eating philosophers are left alone. If the philospher is hungry the
+    conductor checks his neighboring forks. If both forks aren't available it
+    will increment the philosopher's priority value. However, if both forks are
+    available then he tells the philopher to eat and flags the forks as
+    unavailable. The conductor always stores the highest priority value and
+    checks whether or not the current philosopher is >= that value, resetting
+    it when it gives away forks. Upon finding a philosopher flagged as done
+    the conductor will free up his forks and tell him to start thinking.
+
+    :)
+*/
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

@@ -1,5 +1,5 @@
 all:
-	gcc -Wall -pthread conc.c -lpthread -o conc
+	gcc -std=c99 -Wall -pthread conc.c -lpthread -o conc
 
 clean:
 	rm -f conc

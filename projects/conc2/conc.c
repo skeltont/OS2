@@ -100,8 +100,9 @@ void *philosophize(void *philo)
                         printf(KNRM "%s is now thinking!\n" RESET, p->name);
                         think();
                         // tell conductor that we are hungry.
-                        p->state = HUNGRY;
                         printf(KRED "%s is now hungry!\n" RESET, p->name);
+                        p->state = HUNGRY;
+
                 }
                 // wait until conductor reserves forks and says start eating.
                 if (p->state == EATING) {

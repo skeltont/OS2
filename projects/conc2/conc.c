@@ -39,6 +39,12 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define RESET "\033[0m"
+
 // a list of relevant names for our philosophers.
 const char * const NAMES[] = {
         "Aristotle",
@@ -61,7 +67,7 @@ struct philosopher {
 struct conductor {
           int forks[5];
           struct philosopher *philos[5];
-          long high_priority;
+          long priority;
 };
 
 // generate random number within: base .. ((rand % mod) + base).
@@ -91,15 +97,15 @@ void *philosophize(void *philo)
         while(1) {
                 // start thinking
                 if (p->state == THINKING) {
-                        printf("%s is now thinking!\n", p->name);
+                        printf(KNRM "%s is now thinking!\n" RESET, p->name);
                         think();
                         // tell conductor that we are hungry.
                         p->state = HUNGRY;
-                        printf("%s is now hungry!\n", p->name);
+                        printf(KRED "%s is now hungry!\n" RESET, p->name);
                 }
                 // wait until conductor reserves forks and says start eating.
                 if (p->state == EATING) {
-                        printf("%s is now eating!\n", p->name);
+                        printf(KGRN "%s is now eating!\n" RESET, p->name);
                         eat();
                         // tell conductor that we're done with the forks.
                         p->state = DONE;
@@ -118,14 +124,14 @@ void *conduct (void *c)
                 for (int i = 0; i < 5; i++) {
                         curr = con->philos[i];
                         if (curr->state == HUNGRY
-                        && curr->priority >= con->high_priority) {
+                        && curr->priority >= con->priority) {
                                 if (con->forks[curr->lfork] == 0
                                 && con->forks[curr->rfork] == 0) {
                                         // reserve forks
                                         con->forks[curr->lfork] = 1;
                                         con->forks[curr->rfork] = 1;
-                                        printf("%s has picked up forks: "
-                                               "#%d, #%d\n",
+                                        printf(KYEL "%s has picked up forks: "
+                                               "#%d, #%d\n" RESET,
                                                curr->name,
                                                curr->lfork,
                                                curr->rfork);
@@ -134,16 +140,20 @@ void *conduct (void *c)
                                         // reset priority.
                                         curr->state = EATING;
                                         curr->priority = 0;
+                                        con->priority = 0;
                                 } else {
                                         // philosopher has been waiting.
+                                        if (curr->priority > con->priority) {
+                                                con->priority = curr->priority;
+                                        }
                                         curr->priority += 1;
                                 }
                         } else if(curr->state == DONE) {
                                 // release forks
                                 con->forks[curr->lfork] = 0;
                                 con->forks[curr->rfork] = 0;
-                                printf("%s released forks: "
-                                       "#%d, #%d\n",
+                                printf(KYEL "%s released forks: "
+                                       "#%d, #%d\n" RESET,
                                        curr->name,
                                        curr->lfork,
                                        curr->rfork);
@@ -160,7 +170,7 @@ int main(int argc, char const *argv[])
 {
         struct philosopher philos[5];
         struct conductor c = {
-                .high_priority = 0
+                .priority = 0
         };
         pthread_t con_proc, philo_procs[5];
 

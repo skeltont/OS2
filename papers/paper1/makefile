@@ -10,7 +10,7 @@ all:
 	latex --shell-escape $(doc).tex
 	dvips -R -Poutline -t letter $(doc).dvi -o $(doc).ps
 	ps2pdf $(doc).ps
-	open $(doc).pdf
+	#open $(doc).pdf
 
 clean:
 	rm -f *.aux

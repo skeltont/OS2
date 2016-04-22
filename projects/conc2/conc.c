@@ -100,7 +100,6 @@ void *philosophize(void *philo)
                         printf(KNRM "%s is now thinking!\n" RESET, p->name);
                         think();
                         // tell conductor that we are hungry.
-                        printf(KRED "%s is now hungry!\n" RESET, p->name);
                         p->state = HUNGRY;
 
                 }

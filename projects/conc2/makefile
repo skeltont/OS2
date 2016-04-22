@@ -5,3 +5,6 @@ all:
 
 clean:
 	rm -f conc
+
+tar:
+	tar cvjf CS444_concurrency2_118.tar.bz2 conc.c makefile

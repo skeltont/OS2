@@ -26,4 +26,4 @@ bib:
 	bibtex $(doc)
 
 tar:
-	tar cvjf $(assignment) IEEEtran.cls makefile paper.tex references.bib
+	tar cvjf $(assignment) IEEEtran.cls IEEEtran.bst makefile paper.tex references.bib

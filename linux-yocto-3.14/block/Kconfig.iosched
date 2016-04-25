@@ -2,6 +2,14 @@ if BLOCK
 
 menu "IO Schedulers"
 
+config IOSCHED_SSTF
+    #tristate "SSTF I/O scheduler"
+    bool "SSTF I/O scheduler"
+    default y
+    ---help---
+        This is a help message
+        asdf
+
 config IOSCHED_NOOP
 	bool
 	default y
@@ -52,8 +60,12 @@ choice
 	config DEFAULT_CFQ
 		bool "CFQ" if IOSCHED_CFQ=y
 
+    config DEFAULT_SSTF
+        bool "SSTF" if IOSCHED_SSTF=y
+
 	config DEFAULT_NOOP
 		bool "No-op"
+
 
 endchoice
 
@@ -62,6 +74,7 @@ config DEFAULT_IOSCHED
 	default "deadline" if DEFAULT_DEADLINE
 	default "cfq" if DEFAULT_CFQ
 	default "noop" if DEFAULT_NOOP
+    default "sstf" if DEFAULT_SSTF
 
 endmenu
 

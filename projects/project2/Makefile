@@ -1,23 +1,30 @@
-#
-# Makefile for the kernel block layer
-#
+doc = report
+assignment = project2
 
-obj-$(CONFIG_BLOCK) := elevator.o blk-core.o blk-tag.o blk-sysfs.o \
-			blk-flush.o blk-settings.o blk-ioc.o blk-map.o \
-			blk-exec.o blk-merge.o blk-softirq.o blk-timeout.o \
-			blk-iopoll.o blk-lib.o blk-mq.o blk-mq-tag.o \
-			blk-mq-sysfs.o blk-mq-cpu.o blk-mq-cpumap.o ioctl.o \
-			genhd.o scsi_ioctl.o partition-generic.o partitions/
+default: all
 
-obj-$(CONFIG_BLK_DEV_BSG)	+= bsg.o
-obj-$(CONFIG_BLK_DEV_BSGLIB)	+= bsg-lib.o
-obj-$(CONFIG_BLK_CGROUP)	+= blk-cgroup.o
-obj-$(CONFIG_BLK_DEV_THROTTLING)	+= blk-throttle.o
-obj-$(CONFIG_IOSCHED_NOOP)	+= noop-iosched.o
-obj-$(CONFIG_IOSCHED_DEADLINE)	+= deadline-iosched.o
-obj-$(CONFIG_IOSCHED_CFQ)	+= cfq-iosched.o
-obj-$(CONFIG_IOSCHED_SSTF)	+= sstf-iosched.o
+all:
+	latex --shell-escape $(doc).tex
+	latex --shell-escape $(doc).tex
+	dvips -R -Poutline -t letter $(doc).dvi -o $(doc).ps
+	ps2pdf $(doc).ps
+	#open $(doc).pdf
 
-obj-$(CONFIG_BLOCK_COMPAT)	+= compat_ioctl.o
-obj-$(CONFIG_BLK_DEV_INTEGRITY)	+= blk-integrity.o
-obj-$(CONFIG_BLK_CMDLINE_PARSER)	+= cmdline-parser.o
+clean:
+	rm -f *.aux
+	rm -f *.bbl
+	rm -f *.blg
+	rm -f *.dvi
+	rm -f *.log
+	rm -f *.pdf
+	rm -f *.ps
+	rm -f *.toc
+
+testlocal:
+	python testdoc.py
+
+testremote:
+	/usr/local/apps/python/python-3.5.1 testdoc.py
+
+tar:
+	tar cvjf CS444_$(assignment)_118.tar.bz2 IEEEtran.cls makefile $(doc).tex worklog.tex changelog.tex adds_sstf_118.patch

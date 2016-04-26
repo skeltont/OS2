@@ -1,0 +1,97 @@
+\documentclass[10pt,draftclsnofoot,onecolumn]{IEEEtran}
+
+\usepackage{setspace}
+% \usepackage{xcolor}
+% \usepackage{caption}
+\usepackage{listings}
+
+\ifCLASSINFOpdf
+  \usepackage[pdftex]{graphicx}
+  \graphicspath{static/}
+  \DeclareGraphicsExtensions{.pdf,.jpeg,.png}
+\fi
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+% listings options
+\lstset{frame=lrbt,xleftmargin=\fboxsep,xrightmargin=-\fboxsep}
+
+
+\begin{document}
+
+\pagenumbering{gobble}
+\singlespacing
+\title{Project 2}
+
+\author{Ty~Skelton}
+
+
+% The paper headers
+\markboth{CS 444}%
+{Spring 2016}
+
+% make the title area
+\maketitle
+
+% As a general rule, do not put math, special symbols or citations
+% in the abstract or keywords.
+\begin{abstract}
+The second project of Operating Systems 2.
+I was successfully able to implemente a 'shortest seek time first' scheduler in the Linux kernel.
+This alogorithm takes a sorted list and merges requests near entities with nearby sector locations and when dispatching them it will take the nearest one.
+This practice makes sense in theory, but as we'll see in the implementation it has it's flaws and users are better off using other, more standard, schedulers.
+
+
+\end{abstract}
+\IEEEpeerreviewmaketitle
+
+\newpage
+\pagenumbering{arabic}
+
+\tableofcontents
+\newpage
+
+
+\section{I/O Elevators}
+\subsection{Main Point of Assignment}
+The main point of this assignment was to familiarize us (the students) with how block I/O schedulers work and what surprising logic goes on behind the scenes.
+It's easy to speculate algorithms without really understanding the best way to navigate storage, but once you take into account all the concurrent things in motion and the data structures that are flying around it helps bring a real appreciation to the system.
+Through the reading and actually working down in the I/O scheduler internals I learned that what at first glance looks like something easy to pull off actually requires deeper thought and consideration.
+The SSTF scheduler looks for the nearest sector to service in a linked list request queue, which makes sense initially, but it's actually really easy to starve requests that are far off or favor the wrong process.
+Thus, learning about the proper approaches available and implementing our own is a very useful teaching tool.
+
+\subsection{Approach}
+\par My approach was similar to how I generally try to see-through my programming assignments.
+I initially just got the Noop scheduler copied over and globally replaced all references from noop to sstf.
+I then messed with the Kconfig.iosched and Makefile files to make sure my scheduler hooked into the config options.
+After building my kernel I was prompted to switch to sstf and i knew I was cooking with fire.
+
+\par I then focused on getting my merge logic to work in the \textit{add\_sstf\_request} function.
+This meant iterating through the linked list, finding the first applicable location based on sector position and merging it in.
+After I just was comfortable with the adding portion of the logic, I rebuilt my kernel and tested it before moving on.
+Then it was a matter of making sure the dispatch logic made sense and that it serviced the correct area next.
+I check the closest sector position and seek to it, then point my current list\_head to the nearby one that is ready to be serviced next.
+
+\subsection{Ensuring solution was correct}
+Ensuring the solution was correct was a very difficult challenge, because I was dealing with many data structures I was initially unsure of.
+After I was able to successfully attach my scheduler and disable virtio, I began using a series of \textit{printk}s to output what I was looking at.
+This helped me check when certain events happened, like empty queues, when merging happened, etc.
+
+\subsection{What was learned}
+I learned a lot about I/O scheduling, Linux, and myself in this assignment.
+Firstly, I/O scheduling is not easy.
+There is a lot that goes into it and a lot of consideration to do for edge cases and user friendliness.
+I also learned that Linux is not very well documented and you do better to just see examples of how schedulers have been implemented and follow their example.
+I think this was intended, since it would lead to better code consistency and overall exclusion of casual developers, which I definitely am.
+Finally, I learned that I need to start these assignments much earlier.
+I had a tough time with this one and I now know that for me to be effective I need more time to think on a problem.
+
+\section{Version Control Log}
+\input{changelog.tex}
+
+\section{Work Log}
+\input{worklog.tex}
+
+
+\end{document}

@@ -38,8 +38,8 @@
 % in the abstract or keywords.
 \begin{abstract}
 The second project of Operating Systems 2.
-I was successfully able to implemente a 'shortest seek time first' scheduler in the Linux kernel.
-This alogorithm takes a sorted list and merges requests near entities with nearby sector locations and when dispatching them it will take the nearest one.
+I was successfully able to implement a 'shortest seek time first' scheduler in the Linux kernel.
+This algorithm takes a sorted list and merges requests near entities with nearby sector locations and when dispatching them it will take the nearest one.
 This practice makes sense in theory, but as we'll see in the implementation it has it's flaws and users are better off using other, more standard, schedulers.
 
 
@@ -63,7 +63,7 @@ Thus, learning about the proper approaches available and implementing our own is
 
 \subsection{Approach}
 \par My approach was similar to how I generally try to see-through my programming assignments.
-I initially just got the Noop scheduler copied over and globally replaced all references from noop to sstf.
+I initially just got the Noop scheduler copied over and globally replaced all references from Noop to sstf.
 I then messed with the Kconfig.iosched and Makefile files to make sure my scheduler hooked into the config options.
 After building my kernel I was prompted to switch to sstf and i knew I was cooking with fire.
 

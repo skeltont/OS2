@@ -22,18 +22,20 @@
 #define INSERTERS	1
 #define DELETERS	1
 
-struct linkedList {
-	int num;
+struct monitor {
+	struct linkedList *head;
 	sem_t read;
 	sem_t write;
+};
+
+struct linkedList {
+	int num;
 	struct linkedList *next;
 };
 
 void initListItem (struct linkedList *lst, int count)
 {
 	lst->next = malloc(sizeof(struct linkedList));
-	sem_init(&lst->read, 0, 1);
-	sem_init(&lst->write, 0, 1);
 	lst->num = count;
 }
 
@@ -65,95 +67,80 @@ void generateList(struct linkedList *init)
 	}
 }
 
-void *searcher(void *head) {
+void *searcher(void *m) {
 	struct linkedList *curr;
-	int lock_status;
-	curr = head;
+	struct monitor *mon;
+	int read_status;
+
+	mon = m;
+	curr = mon->head;
+
 	for (;;) {
-		sem_getvalue(&curr->read, &lock_status);
-		if (lock_status == 1) {
+		sem_getvalue(&mon->read, &read_status);
+		if (read_status == 1) {
 			printf(KYEL "SEARCHER: read %d\n" RESET, curr->num);
 			curr = curr->next;
-		} else {
-			printf(KYEL "SEARCHER: %d is a read-locked link, skipping over series.\n" RESET,
-				curr->num);
-			curr = curr->next->next;
 		}
 		sleep(1);
 	}
 }
 
-void *inserter(void *head) {
+void *inserter(void *m) {
 	struct linkedList *curr;
-	int lock_status_curr, lock_status_next;
+	struct monitor *mon;
+	int write_status;
 
-	curr = head;
+	mon = m;
+	curr = mon->head;
 
 	for (;;) {
-		sem_getvalue(&curr->write, &lock_status_curr);
-		sem_getvalue(&curr->next->write, &lock_status_next);
-		if (lock_status_curr == 1 && lock_status_next == 1) {
+		sem_getvalue(&mon->write, &write_status);
+		if (write_status == 1) {
 			if ((rand() % 3 ) == 0) {
-				sem_wait(&curr->write);
-				sem_wait(&curr->next->write);
+				sem_wait(&mon->write);
 
-				printf(KGRN "INSERTER: inserting, write-locking %d, %d.\n" RESET,
-					curr->num, curr->next->num);
+				printf(KGRN "INSERTER: inserting, write-locking.\n");
 				sleep (5);
-				printf(KGRN "INSERTER: write releasing %d, %d.\n" RESET,
-					curr->num, curr->next->num);
+				printf(KGRN "INSERTER: write releasing.\n" RESET);
 
-				sem_post(&curr->write);
-				sem_post(&curr->next->write);
+				sem_post(&mon->write);
 			} else {
 				sleep(1);
 			}
 			curr = curr->next;
-		} else {
-			printf(KGRN "INSERTER: %d is a write-locked link, skipping over series.\n" RESET, 
-				curr->num);
-			curr = curr->next->next;
-			sleep(2);
 		}
+		sleep(1);
 	}
 }
 
-void *deleter(void *head) {
+void *deleter(void *m) {
 	struct linkedList *curr;
-	int lock_status_curr, lock_status_next;
+	struct monitor *mon;
+	int write_status;
 
-	curr = head;
+	mon = m;
+	curr = mon->head;
 
 	for(;;) {
-		sem_getvalue(&curr->write, &lock_status_curr);
-		sem_getvalue(&curr->next->write, &lock_status_next);
-		if (lock_status_curr == 1 && lock_status_next == 1) {
+		sem_getvalue(&mon->write, &write_status);
+		if (write_status == 1 ) {
 			if((rand() % 3) == 0) {
-				sem_wait(&curr->write);
-                                sem_wait(&curr->next->write);
-				sem_wait(&curr->read);
-				sem_wait(&curr->next->read);
+				sem_wait(&mon->write);
+				sem_wait(&mon->read);
 
-                                printf(KRED "DELETER: inserting, write/read-locking %d, %d.\n" RESET,
-                                        curr->num, curr->next->num);
+                                printf(KRED "DELETER: inserting, write/read-locking.\n" RESET);
                                 sleep (5);
-                                printf(KRED "DELETER: write/read releasing %d, %d.\n" RESET, 
-					curr->num, curr->next->num);
+                                printf(KRED "DELETER: write/read releasing.\n" RESET);
 
-                                sem_post(&curr->write);
-                                sem_post(&curr->next->write);
-				sem_post(&curr->read);
-				sem_post(&curr->next->read);
-			} else { 
+                                sem_post(&mon->write);
+				sem_post(&mon->read);
+
+			} else {
 				sleep(1);
 			}
 			curr = curr->next;
-		} else {
-			printf(KRED "DELETER: %d is a write-locked link, skipping over series.\n" RESET,
-				curr->num);
-                        curr = curr->next->next;
-                        sleep(2);
 		}
+		sleep(1);
 	}
 }
 
@@ -166,27 +153,33 @@ void cleanUpThreads(pthread_t *procs, int count) {
 
 int main(int argc, char const *argv[])
 {
+	struct monitor *mon;
 	struct linkedList *init;
 	int i;
 	pthread_t search_procs[SEARCHERS],
 		  insert_procs[INSERTERS],
 		  delete_procs[DELETERS];
 
-	// initialize our singly-linked list stuff
+	// generate our singly-linked list
 	init = createLinkedListItem(0);
 	generateList(init);
 
+	// set up our monitor object
+	mon->head = init;
+	sem_init(&mon->read, 0, 1);
+	sem_init(&mon->write, 0, 1);
+
 	// spin up searchers
 	for (i = 0; i < SEARCHERS; i++) {
-		pthread_create(&search_procs[i], NULL, searcher, (void*)init);
+		pthread_create(&search_procs[i], NULL, searcher, (void*)mon);
 	}
 
 	for (i = 0; i < INSERTERS; i++) {
-		pthread_create(&insert_procs[i], NULL, inserter, (void*)init);
+		pthread_create(&insert_procs[i], NULL, inserter, (void*)mon);
 	}
 
 	for (i = 0; i < DELETERS; i++) {
-		pthread_create(&delete_procs[i], NULL, deleter, (void*)init);
+		pthread_create(&delete_procs[i], NULL, deleter, (void*)mon);
 	}
 
 	// thread termination and clean-up

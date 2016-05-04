@@ -1,7 +1,7 @@
 default: all
 
 all:
-	gcc -std=c99 -Wall -pthread -Wno-deprecated conc.c -lpthread -o conc
+	gcc -std=c99 -Wall -pthread conc.c -lpthread -o conc
 
 clean:
 	rm -f conc

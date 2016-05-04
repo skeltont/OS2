@@ -17,15 +17,17 @@
 #define KYEL  	"\x1B[33m"
 #define RESET 	"\033[0m"
 
-#define LIST_SIZE 	5
+#define LIST_SIZE 	7
 #define SEARCHERS	3
-#define INSERTERS	1
-#define DELETERS	1
+#define INSERTERS	2	
+#define DELETERS	2
+
 
 struct monitor {
 	struct linkedList *head;
 	sem_t read;
 	sem_t write;
+	int size;
 };
 
 struct linkedList {
@@ -33,16 +35,27 @@ struct linkedList {
 	struct linkedList *next;
 };
 
-void initListItem (struct linkedList *lst, int count)
+void initListItem (struct linkedList *lst)
 {
 	lst->next = malloc(sizeof(struct linkedList));
-	lst->num = count;
+	lst->num = rand() % 1000;
 }
 
-struct linkedList *createLinkedListItem(int count)
+void addLink (struct linkedList *head) {
+	struct linkedList *newLink = malloc(sizeof(struct linkedList));
+	initListItem(newLink);
+	newLink->next = head->next;
+	head->next = newLink;
+}
+
+void removeLink (struct linkedList *head) {
+	head->next = head->next->next;
+}
+
+struct linkedList *createLinkedListItem()
 {
 	struct linkedList *newList = malloc(sizeof(struct linkedList));
-	initListItem(newList, count);
+	initListItem(newList);
 	return(newList);
 }
 
@@ -69,65 +82,72 @@ void generateList(struct linkedList *init)
 
 void *searcher(void *m) {
 	struct linkedList *curr;
-	struct monitor *mon = (struct monitor*)m;
 	int read_status;
+	struct monitor *mon = (struct monitor*)m;
+	unsigned int id = (unsigned int) pthread_self();
 
 	curr = mon->head;
 
 	for (;;) {
 		sem_getvalue(&mon->read, &read_status);
 		if (read_status == 1) {
-			printf(KYEL "SEARCHER: read %d\n" RESET, curr->num);
-			curr = curr->next;
+			printf(KYEL "#%X: read %d" RESET "\n", id, curr->num);
 		}
-		sleep(1);
+		sleep(rand() % 3);
+		curr = curr->next;
 	}
 }
 
 void *inserter(void *m) {
 	struct linkedList *curr;
-	struct monitor *mon = (struct monitor*)m;
 	int write_status;
+	struct monitor *mon = (struct monitor*)m;
+	unsigned int id = (unsigned int) pthread_self();
 
 	curr = mon->head;
 
 	for (;;) {
 		sem_getvalue(&mon->write, &write_status);
 		if (write_status == 1) {
-			if ((rand() % 3 ) == 0) {
+			if ((rand() % 5) == 0) {
 				sem_wait(&mon->write);
 
-				printf(KGRN "INSERTER: inserting, write-locking.\n");
-				sleep (5);
-				printf(KGRN "INSERTER: write releasing.\n" RESET);
+				printf(KGRN "#%X: inserting, write-locking." RESET "\n", id);
+				addLink(curr);
+				mon->size++;
+				printf(KGRN "#%X: inserted %d, write releasing.\tlist size = %d" RESET "\n", id, curr->next->num, mon->size);
+				sleep(rand() % 5);
 
 				sem_post(&mon->write);
 			} else {
 				sleep(1);
 			}
-			curr = curr->next;
 		}
 		sleep(1);
+		curr = curr->next;
 	}
 }
 
 void *deleter(void *m) {
 	struct linkedList *curr;
-	struct monitor *mon = (struct monitor*)m;
 	int write_status;
+	struct monitor *mon = (struct monitor*)m;
+	unsigned int id = (unsigned int) pthread_self();
 
 	curr = mon->head;
 
 	for(;;) {
 		sem_getvalue(&mon->write, &write_status);
-		if (write_status == 1 ) {
-			if((rand() % 3) == 0) {
+		if (write_status == 1) {
+			if((rand() % 5) == 0 && curr->next != curr) {
 				sem_wait(&mon->write);
 				sem_wait(&mon->read);
 
-                                printf(KRED "DELETER: inserting, write/read-locking.\n" RESET);
-                                sleep (5);
-                                printf(KRED "DELETER: write/read releasing.\n" RESET);
+                                printf(KRED "#%X: deleting %d, write/read-locking." RESET "\n", id, curr->next->num);
+				removeLink(curr);
+				mon->size--;
+                                sleep (rand() % 5);
+                                printf(KRED "#%X: write/read releasing.\t\tlist size = %d" RESET "\n", id, mon->size);
 
                                 sem_post(&mon->write);
 				sem_post(&mon->read);
@@ -135,9 +155,9 @@ void *deleter(void *m) {
 			} else {
 				sleep(1);
 			}
-			curr = curr->next;
 		}
 		sleep(1);
+		curr = curr->next;
 	}
 }
 
@@ -151,17 +171,17 @@ void cleanUpThreads(pthread_t *procs, int count) {
 int main(int argc, char const *argv[])
 {
 	struct monitor *mon = malloc(sizeof(struct monitor));
-	// struct linkedList *init;
 	int i;
 	pthread_t search_procs[SEARCHERS],
 		  insert_procs[INSERTERS],
 		  delete_procs[DELETERS];
 
-	// generate our singly-linked list
-	mon->head = createLinkedListItem(0);
-	generateList(mon->head);
+	srand(time(NULL));
 
-	// set up our monitor object
+	// generate our singly-linked list and set up monitor locks
+	mon->head = createLinkedListItem();
+	mon->size = LIST_SIZE + 1;
+	generateList(mon->head);
 	sem_init(&mon->read, 0, 1);
 	sem_init(&mon->write, 0, 1);
 

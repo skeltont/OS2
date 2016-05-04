@@ -69,10 +69,9 @@ void generateList(struct linkedList *init)
 
 void *searcher(void *m) {
 	struct linkedList *curr;
-	struct monitor *mon;
+	struct monitor *mon = (struct monitor*)m;
 	int read_status;
 
-	mon = m;
 	curr = mon->head;
 
 	for (;;) {
@@ -87,10 +86,9 @@ void *searcher(void *m) {
 
 void *inserter(void *m) {
 	struct linkedList *curr;
-	struct monitor *mon;
+	struct monitor *mon = (struct monitor*)m;
 	int write_status;
 
-	mon = m;
 	curr = mon->head;
 
 	for (;;) {
@@ -115,10 +113,9 @@ void *inserter(void *m) {
 
 void *deleter(void *m) {
 	struct linkedList *curr;
-	struct monitor *mon;
+	struct monitor *mon = (struct monitor*)m;
 	int write_status;
 
-	mon = m;
 	curr = mon->head;
 
 	for(;;) {
@@ -153,19 +150,18 @@ void cleanUpThreads(pthread_t *procs, int count) {
 
 int main(int argc, char const *argv[])
 {
-	struct monitor *mon;
-	struct linkedList *init;
+	struct monitor *mon = malloc(sizeof(struct monitor));
+	// struct linkedList *init;
 	int i;
 	pthread_t search_procs[SEARCHERS],
 		  insert_procs[INSERTERS],
 		  delete_procs[DELETERS];
 
 	// generate our singly-linked list
-	init = createLinkedListItem(0);
-	generateList(init);
+	mon->head = createLinkedListItem(0);
+	generateList(mon->head);
 
 	// set up our monitor object
-	mon->head = init;
 	sem_init(&mon->read, 0, 1);
 	sem_init(&mon->write, 0, 1);
 

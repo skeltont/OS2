@@ -1,0 +1,1 @@
+cmd_/nfs/stak/students/s/skeltont/cs444/modules/sbd.ko := ld -r -m elf_i386 -T /scratch/spring2016/cs444-118/linux-yocto-3.14/scripts/module-common.lds --build-id  -o /nfs/stak/students/s/skeltont/cs444/modules/sbd.ko /nfs/stak/students/s/skeltont/cs444/modules/sbd.o /nfs/stak/students/s/skeltont/cs444/modules/sbd.mod.o

@@ -1,5 +1,5 @@
 doc = paper
-assignment = writing2
+assignment = writing3
 
 default: all
 
@@ -22,8 +22,8 @@ clean:
 	rm -f *.ps
 	rm -f *.toc
 
-# testlocal:
-# 	python testdoc.py
+testlocal:
+	python testdoc.py
 #
 # testremote:
 # 	/usr/local/apps/python/python-3.5.1 testdoc.py

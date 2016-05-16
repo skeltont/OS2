@@ -23,7 +23,10 @@
 \maketitle
 
 \begin{abstract}
-This is an abstract
+Interrupts and their handlers are a core fundamental for any kernel and a necessary topic to understand when developing functionality inside of an operating system.
+Any device introduced to your system will attempt to interface via interrupts with running processes and it's important that there is a standardized approach towards handling them in order to handle things like errors, the availability of resources, etc.
+In this paper we will explore the details of how interrupts work and how the operating system views and organizes them, while comparing the approach of each against Linux's implementation.
+
 \end{abstract}
 
 \begin{center}
@@ -59,10 +62,6 @@ A software interrupt is one that originates from itself or another process.
 An example of a process interrupting itself would be handling an error exception or an invalid access.
 A hardware interrupt could come from something the user interacts with like a mouse or a keyboard, or it could come from one of the machines components.
 Ultimately, an interrupt should be viewed as an interjection to an arbitrary process that reflects an event in the system.
-
-\subsection{FreeBSD}
-\label{sub:Interrupts FreeBSD}
-% @TODO: WRITE
 
 \subsection{Windows}
 \label{sub:Interrupts Windows}
@@ -111,15 +110,74 @@ Dumping IDT:
 \label{code:idt_sample}
 \end{figure}
 
+\subsection{FreeBSD}
+\label{sub:Interrupts FreeBSD}
+\par FreeBSD has systems in place for handling interrupts at either the software or hardware level as well.
+These different situations as described in the text are traps, I/O device interrupts, software interrupts, and clock interrupts \cite{bsd:1}.
+Traps are similar to system calls in the regards to their synchronous executions.
+FreeBSD trap handlers first save the process state, then the handler determines the type of trap to find the correct signal, and finally exits like a system-call handler \cite{bsd:1}.
+
+\par I/O device interrupts stem from I/O device connected to the system through their respective drivers.
+These differ from trap handlers in that they are asynchronous in nature, typically occurring dynamically when resources of interest become available/unavailable.
+I/O interrupt routines are pre-loaded into the kernel's address space.
+The interesting part about interrupt handlers in FreeBSD is that since their asynchronous and occur on demand, they each have their own thread-space, completely isolating them from other handlers and allowing them to be completely discrete \cite{bsd:1}.
+Even though it's possible to block an interrupt while waiting for a particular resource, it's more likely they'll just run to completion since while they're blocking they can't be accessed by other events \cite{bsd:1}.
+
+\par In FreeBSD a software interrupt simply refers to a the mechanism for performing lower-priority processing \cite{bsd:1}.
+Just like hardware-stemming device interrupts, software interrupts have their own context assigned to them.
+This means that priority can fluctuate depending on if they're assigned to a user process or not.
+The process priority hierarchy for handlers from high to low goes as hardware device interrupt, software interrupt, and user process \cite{bsd:1}.
+This means that at each hierarchical level if there are no tasks in the queue that need service, then the next lower will be serviced.
+Interestingly, if a hardware interrupt arrives the scheduler will actually halt any currently running software/user interrupt processes to service the recent hardware interrupt \cite{bsd:1}.
+
+\par Clock interrupts are important to a clock driven system.
+The system will actually receive an interrupt at every regular ``tick" interval, which can be 1000 times per second.
+This is highly inefficient, so FreeBSD implemented a system for predetermining the next required action and schedules an interrupt for that time \cite{bsd:1}.
+The routine \texttt{hardclock()} is the handler for high hardware-interrupt priority clock interrupts.
+Since ticks can be very frequent and occur quickly, it is also imperative that the \texttt{hardclock()} handler is also quick as to not offset and lose time \cite{bsd:1}.
+It's pair \texttt{softclock()} handles lower-priority time operations in an effort to keep calls to \texttt{hardclock()} minimal.
+
 \subsection{Compared to Linux}
 \label{sub:Interrupts Linux}
-% @TODO: WRITE
+\par Outside of a few subtle differences, Linux shares the same approach towards interrupts and interrupt handlers as FreeBSD and Windows.
+Interrupts are a simple idea and since every operating system strives to achieve them in the most efficient manner, they're bound to agree somewhere in implementation.
+Whether it be hardware interrupts, software interrupts, or trap handlers these three kernels seem to agree in a lot of areas.
+Interesting areas of specific differences are FreeBSD priority queue for handler process tasks and Windows IDT handler look up table \cite{bsd:1} \cite{win:1}.
+
+\par Like in FreeBSD and for some interrupts in Windows, the Linux kernel runs the required interrupt handler in response to the interrupt received.
+Interrupt handlers are implemented through C Code and are tethered to their specific prototype for the Kernel to reference, but in the end they are just regular functions \cite{linux:1}.
+The functionality that both differentiates interrupt handler threads from other system threads and both Windows \& FreeBSD kernels is that they're assigned their own unique context, called the \textit{interrupt context}.
+The text mentions that this context can be referred to as an \textit{atomic} context, because it cannot block \cite{linux:1}.
+This is a highlighted difference between Linux and FreeBSD, because FreeBSD can allow interrupt handlers to block if necessary (see Section \ref{sub:Interrupts FreeBSD}).
+
+\par To highlight the fact that Linux requires it's handlers be lightweight and efficient, in an approach also shared by Windows and FreeBSD, it's useful to see an example of a handler being called by the kernel in Figure \ref{code:linux_handler}.
+All three kernels (Windows, FreeBSD, and Linux) strive to be as fast and efficient as possible when handling interrupts from any source.
+This means writing clean and abstract code that promotes consistency and reusability.
+While this can be hard to implement 100\% of the time when in development, we can see this in practice with real-time clock (RTC) handler, which is only about 40 lines of code.
+We discussed earlier in the FreeBSD section how important this interrupt handler is and it's requirements of being very quick.
+
+
+\begin{figure}[h]
+\begin{lstlisting}
+  if (request_irq(irqn, my_interrupt, IRQF_SHARED, "my_device", my_dev)) {
+          printk(KERN_ERR "my_device: cannot register IRQ %d\n", irqn);
+          return -EIO;
+  }
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  An example of the Linux kernel calling the interrupt handler and wrapping it in a conditional based on whether or not the call was successful.
+  to break the call down you can see that \texttt{irqn} is the actual interrupt line, \texttt{my\_interrupt} refers to the handler, \texttt{IRQF\_SHARED} is the flag that tells the handler the line is to be shared, followed by the name of the device, and finally \texttt{my\_dev} replaces the \texttt{dev} parameter.
+}
+\label{code:linux_handler}
+\end{figure}
 
 % @NOTE: SECTION ===============================
 \section{Conclusion}
 \label{sec:Conclusion}
-As we've seen in this section- Linux, Windows, and FreeBSD share similarities across their individual Interrupt philosophies, but still retain their own distinct differences.
-Things like the handlers implemented in each are a common sharepoint, due to their great fit for their purpose, while at the same time systems like Windows have tools that introduce their own unique functionality.
+\par As we've seen in this section- Linux, Windows, and FreeBSD share similarities across their individual Interrupt philosophies, but still retain their own distinct differences.
+Things like the handlers implemented in each are a common share-point, due to their great fit for their purpose, while at the same time systems like Windows have tools that introduce their own unique functionality.
 We've explored how crucial an efficient Interrupt system is to an operating system and taken glimpses into their handlers complex inner-workings and timings.
 As we continue to explore kernel structures within different operating systems more and more will become clear, but for now understanding the interrupt systems serve as an excellent stepping stone on our path.
 

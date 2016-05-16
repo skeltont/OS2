@@ -1,7 +1,0 @@
-\contentsline {section}{\numberline {I}Introduction}{2}
-\contentsline {section}{\numberline {II}Interrupts}{2}
-\contentsline {subsection}{\numberline {\unhbox \voidb@x \hbox {II-A}}FreeBSD}{2}
-\contentsline {subsection}{\numberline {\unhbox \voidb@x \hbox {II-B}}Windows}{2}
-\contentsline {subsection}{\numberline {\unhbox \voidb@x \hbox {II-C}}Compared to Linux}{2}
-\contentsline {section}{\numberline {III}Conclusion}{2}
-\contentsline {section}{References}{3}

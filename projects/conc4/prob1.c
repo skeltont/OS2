@@ -20,12 +20,14 @@
 #define CAPACITY    	3
 #define NUM_WORKERS	6 
 
+// shared resource data structure
 struct resource {
 	char *buffer[BUFFER_SIZE];
 	sem_t capacity;
 	int clear_capacity;
 };
 
+// check if more workers can access
 int check_capacity(struct resource *res, int capacity) {
 	if (res->clear_capacity == 1 && capacity < 3) {
 		return 0;
@@ -40,6 +42,7 @@ int check_capacity(struct resource *res, int capacity) {
 	return 1;
 }		
 
+// worker thread function
 void *worker(void *r) 
 {
 	struct resource *res = (struct resource*) r;

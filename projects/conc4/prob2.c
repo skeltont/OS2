@@ -2,7 +2,6 @@
    	Author: Ty Skelton
    	Class: CS444 - Operating Systems 2
    	Assignment: Concurrency 4 - Problem 2
-    	Solution:
 */
 
 #include <stdio.h>
@@ -25,23 +24,28 @@
 const char *names[NUM_CUSTOMERS] = { "Ty", "Tristan", "Chris", "Jonah", "John", 
 		       "Cooper", "Trung", "Heather", "Carlos", "Shane" };
 
+// this is like the "desk" at the barber shop. it keeps track
+// of the chair, the front of the line, and how full the lobby is.
 struct monitor {
 	struct queue *head;
 	sem_t chair;
 	int size;
 };
 
+// the lobby queue. doubly linked list with references to each person in line.
 struct queue {
 	struct person *pers;
 	struct queue *next;
 	struct queue *prev;
 };
 
+// each person knows where the desk is and has a name
 struct person {
 	struct monitor *mon;
 	const char *name;
 };
 
+// place person in queue
 void _add_to_queue(struct queue *link, struct queue *prev, struct person *pers) {
 	link->next = prev->next; 
 	link->prev = prev;
@@ -49,6 +53,7 @@ void _add_to_queue(struct queue *link, struct queue *prev, struct person *pers) 
 	prev->next = link;
 }
 
+// remove person from queue
 void _leave_queue(struct monitor *mon, struct person *pers) {
 	struct queue *next, *prev, *curr = mon->head->next;
 
@@ -66,6 +71,7 @@ void _leave_queue(struct monitor *mon, struct person *pers) {
 	}
 }
 
+// display the queue state
 void _print_queue(struct person *pers) {
 	struct queue *curr = pers->mon->head->next;
 
@@ -79,6 +85,7 @@ void _print_queue(struct person *pers) {
 	printf(RESET "\n");
 }
 
+// handle joining a queue logic
 int _join_queue(struct person *pers) {
 	struct queue *seat, *curr = pers->mon->head;
 
@@ -106,16 +113,20 @@ int _join_queue(struct person *pers) {
 	return 0;
 }
 
+// pseudo-work for cutting hair
 void cut_hair() {
 	sleep(HAIRCUT_TIME);
 };
 
+// pseudo-work for getting hair cut
 void get_hair_cut(struct person *pers) {
 	printf(KGRN "%s is the getting their hair cut" RESET "\n",
 		pers->name);
 	sleep(HAIRCUT_TIME);
 };
 
+// check if user is ready to get hair cut, if not block.
+// simulates reading a magazine in the lobby or something.
 void ready_for_haircut(struct person *pers) {
 	int chair_status;
 	int ready = 0;
@@ -128,12 +139,15 @@ void ready_for_haircut(struct person *pers) {
 	}
 }
 
+// the barber thread function
 void *barber(void *m) {
 	struct monitor *mon = (struct monitor*) m;
 	int chair_status;
 
 	for (;;) {
 		sem_getvalue(&mon->chair, &chair_status);
+
+		// check if someone is tryna sit in that chair
 		if (chair_status == 0) {
 			cut_hair();
 			printf(KRED "Barber has completed the hair cut, ");
@@ -146,6 +160,7 @@ void *barber(void *m) {
 	}
 }
 
+// customer thread function
 void *customer(void *p) {
 	struct person *pers = (struct person*) p;
 
@@ -174,11 +189,13 @@ void *customer(void *p) {
 			// get out of barber chair
 			sem_post(&pers->mon->chair);
 		} else {
+			// chill out
 			sleep(4);
 		}
 	}
 }
 
+// print out splash message
 void introduction() {
 	// title
 	printf("\t---------------\n"

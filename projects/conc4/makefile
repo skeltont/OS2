@@ -13,4 +13,4 @@ clean:
 	rm -f prob2
 
 tar:
-	tar cvjf CS444_concurrency3_118.tar.bz2 prob1.c prob2.c makefile
+	tar cvjf CS444_concurrency4_118.tar.bz2 prob1.c prob2.c makefile

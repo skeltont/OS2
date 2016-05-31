@@ -1,4 +1,4 @@
-default: all
+default: all 
 
 all: prob1 prob2
 

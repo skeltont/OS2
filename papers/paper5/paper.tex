@@ -1,0 +1,210 @@
+\documentclass[10pt,draftclsnofoot,onecolumn]{IEEEtran}
+
+\usepackage{setspace}
+\usepackage{listings}
+\usepackage{cite}
+\usepackage{caption}
+
+% set syntax highlighting for listings
+\lstset{language=C}
+\lstset{frame=lrbt,xleftmargin=\fboxsep,xrightmargin=-\fboxsep}
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+\begin{document}
+
+\pagenumbering{gobble} % hide page number on first page
+\singlespacing % set spacing
+\title{Operating System Feature Comparison: File System}
+
+\author{Ty~Skelton}
+
+% make the title area
+\maketitle
+
+\begin{abstract} % @TODO
+In this report I will cover the similarities and differences of file systems between the systems for Windows, FreeBSD, and Linux.
+While these are three completely independent systems with their own data structures and implementations, there are a surprising number of similarities between them.
+We'll specifically cover each operating system's default file systems along with how their mounted and interfaced with.
+\end{abstract}
+
+\begin{center}
+\scshape % Small caps
+CS444 - Operating Systems 2 \\  % Course
+Spring Term\\[\baselineskip]    % Term
+Oregon State University\par     % Location
+\end{center}
+
+\IEEEpeerreviewmaketitle
+
+\newpage
+\pagenumbering{arabic}
+\tableofcontents
+\newpage
+
+% \cite{bsd:1} \cite{win:2} \cite{linux:1}
+% @NOTE: SECTION ===============================
+\section{Introduction}
+\label{sec:Introduction}
+\par For the final installment of our writing prompts, we'll be covering file systems.
+File systems are handled surprisingly different in Linux, Windows, and FreeBSD.
+Further exploring how they are implemented and ran in the system for managing disk space will help us understand the necessary interactions in the operating system and it's partitions.
+This next section will go in-depth on how the three systems (FreeBSD, Windows, and Linux) handle interrupts, while highlighting any differences or similarities between the former two and Linux and we'll explore the intricate workings of these systems.
+
+% @NOTE: SECTION ===============================
+\section{File Systems}
+\label{sec:File Systems}
+
+\par Filesystems are the interface that is implemented through the operating system over a disk or a partition recognized by the system.
+The difference between filesystems and the actual disk/partition within is very important.
+Many programs actually expect a filesystem to operate on for interacting with the disk/partition, but there are some that actually require being able to operate on the raw sectors.
+Prior to installing a filesystem on a disk, it needs to be initialized and the proper data structures need to be written.
+In the coming subsections, we'll cover the different data structures and filesystems present within our three different operating systems of interest.
+
+\subsection{Windows}
+\label{sub:File Systems Windows}
+
+\par The Windows system supports several filesystems, such as: CDFS, UDF, FAT12/16/32, exFAT, and NTFS, which is the Windows default \cite{win:2}.
+NTFS (New Technology File System) makes use of 64-bit cluster numbers, which gives the filesystem the ability to address volumes up to 16 exaclusters in size \cite{win:2}.
+This is defeated in part by the fact that Windows actually limits systems using NTFS to an addressable 32-bit cluster size.
+This results in the limit of maximum file size to 16TB.
+An example of how to assign an NTFS mount-point folder path to a drive can be seen in Fig: \ref{code:ntfs-mount}.
+
+\begin{figure}[h]
+\begin{lstlisting}
+  \..> diskpart
+  \..> list volume
+  \..> select volume <number>
+  \..> assign [mount=<path>]
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  Walk-through for command-line for assigning a mount-point folder path to a drive.
+  \texttt{list volume} is for displaying a list of volumes on disks (important to record the number of the volume you're interested in).
+  \texttt{select volume} selects a volume by number and gives it focus. f
+  inally, \texttt{assign} assigns a drive letter or mount-point folder path to the volume with focus. This also allows the user to change the drive letter associated.
+}
+\label{code:ntfs-mount}
+\end{figure}
+
+\par NTFS is the default file system for Windows, which was designed for systems that require a filesystem over a disk larger than 32GB, since FAT32 can't create a file system over 32GB.
+NTFS is highly extensible and provides support for many desirable qualities including, among other things, access control and encryption \cite{win:2}.
+NTFS stores every file as a file descriptor in the Master File Table.
+The Master File Table retains all of the information about the file, like size, allocation, name, etc. \cite{win:2}.
+The leading and trailing sectors of the file system are responsible for storing file system settings (i.e. boot record / superblock).
+Since it uses 64-bit values for referencing files it's able to support very large disk storages.
+
+\par The FAT file system (File Allocation Table) was replaced by NTFS with newer machines, but can still be found in use today.
+The FAT file system manages a file system descriptor selector, file system block allocation table, and plain storage space for storing files, which are stored in directories \cite{win:2}.
+Each directory is an array of 32-byte records, each record is a reference to the first block of the file.
+They are stored in a linked-list data structure, where any block can be found in a block allocation table.
+The number following FAT (e.g. FAT12, FAT16, FAT32) corresponds to the number of bits that are used to enumerate the file system block \cite{win:2}.
+Windows cannot create a FAT32 file system over the size of 32GB.
+
+\par Managing the file system formats requires specialized drivers, called file system drivers (FSDs) \cite{win:2}.
+These drivers run in kernel mode and must be registered with the I/O manager.
+They also tend to interact with the memory manager more extensively \cite{win:2}.
+There are two different types of file system drivers: local FSDs and network FSDs.
+Local FSDs are responsible for managing volumes that have a direct connection to the computer.
+Network FSDs, on the other hand, handle accessing data volumes cover a remote connection.
+
+\subsection{FreeBSD}
+\label{sub:File Systems FreeBSD}
+
+\par FreeBSD defaults to ZFS, but supports a range of file systems.
+ZFS (Z File System) was originally developed by Sun, but any ongoing development has been since moved to the OpenZFS project.
+The Z File System has three goals: \cite{bsd:2}
+\begin{list}{*}{}
+\item Data Integrity: all data will include a checksum that is calculated after being written to the disk.
+After a successful read operation the checksum will be calculated and checked against the original value.
+any discrepencies between the values will signify an error and ZFS will attempt to correct them.
+\item Pooled Storage: physical devices connected to the system are seen as a pool and storage space is allocated to the system from that pool.
+The pool can be increased at any time by adding more storage devices to that pool.
+\item Performance: performance is increased thorugh the use of multiple caching mechanisms.
+\end{list}
+
+\par ZFS is regarded highly by many due to it's unique advantages and benefits.
+It is not only a filesystem, but also a volume manager.
+As mentioned prior with the ``Pooled Storage" goal, ZFS is able to be aware of the underlying structure of the disks, rather than focus on one at a time \cite{bsd:1}.
+This system implemented by a ZFS file system allows many different file systems to be all sharing a pool of available storage.
+An example of how to mount a zfs filesystem is show in Fig \ref{code:zfs-mount}.
+
+
+\begin{figure}[h]
+\begin{lstlisting}
+  freebsd# zfs mount zfs/www
+  freebsd# mount
+  /dev/ad0s1a on / (ufs, local)
+  devfs on /dev (devfs, local, multilabel)
+  /dev/ad0s1e on /tmp (ufs, local, soft-updates)
+  /dev/ad0s1f on /usr (ufs, local, soft-updates)
+  /dev/ad0s1d on /var (ufs, local, soft-updates)
+  zfs on /zfs (zfs, local)
+  zfs/www on /zfs/www (zfs, local)
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  Walk-through for command-line for mounting a zfs file system on FreeBSD.
+  the first command \texttt{zfs mount} tells the system what path to mount the zfs filesystem to.
+  \texttt{mount} then runs the command and mounts the system, providing the successful output to the prompt.
+}
+\label{code:zfs-mount}
+\end{figure}
+
+\par ZFS is very monolithic in nature and consists of many layers.
+Filesystem namespace management, filesystem storage management, volume management, and cache management \cite{bsd:1}.
+This monolithic structuring is actually very beneficial to ZFS in that it provides many benefits.
+A few examples of the benefits provided are: up to petabyte-size storage pools capable of scaling to zetabytes, variable block sizes, data integrity through checksums, disk-level redundancy, intelligent prefetch, and many more! \cite{bsd:1}
+
+\par ZFS defining difference is it's focus on scalability and shared disks in a pool-type structure (much like the borg).
+Whereas other, more traditional, filesystems tend to manage disks at the physical level and count on only the blocks they know about, ZFS hands out space as-needed.
+This means disks can be added and removed safely by an administrator and the system will continue to hum.
+
+\subsection{Compared to Linux}
+\label{sub:File Systems Linux}
+\par Linux defaults to ext3, but like the FreeBSD, it also supports a very wide range of filesystems, where Windows only supports a few \cite{linux:1}\cite{win:2}.
+Choosing the right filesystem is crucial for any operating system, so the ability to choose from a wider range can be a benefit and problematic.
+Having more options is convenient for finding the right fit, but supporting many at a time can introduce more room for errors and issues.
+This is a trade-off in Linux that educated users will understand and consciously decide to work around if need be.
+
+\par Ext3 (third extended filesystem), the default filesystem for Linux, is set as such for a variety of reasons.
+Outside of the fact that users are able to in-place upgrade from ext2 to ext3 without any backups, it's considered power-efficient and safer than most other Linux filesystems \cite{linux:2}.
+The block size ranges from 2 to 8-bit, but the maximum file size can go up to 2TB with an overall filesystem size of 32TB \cite{linux:2}.
+This is shadowed by both ZFS and NTFS, which can go much higher.
+Considering the face that it also has no online option for defragmentation, ext3 is the least-capable filesystem when compared to the defaults of Windows and FreeBSd, NTFS and ZFS, respectively.
+
+\par Remembering back to how Linux supports a variety of filesystem implementations, one starts to wonder how this is possible without too many problems arising.
+This potential is a result of the Linux kernel's abstract interface, which provides a conveniently generic way to ``plug in" a different filesystem \cite{linux:1}.
+It does this by defining the basic conceptual interfaces and data structures that all of the file systems support \cite{linux:1}.
+This is very different from Windows, which can be observed through any of their practices, tends to offer only very specific and defined interfaces for approved interfaces.
+FreeBSD, however, follows along a similar vein to Windows, but supporting a broader range of filesystems and even disk devices \cite{bsd:1}.
+
+
+% @NOTE: SECTION ===============================
+\section{Conclusion}
+\label{sec:Conclusion} % @TODO
+\par As we've seen in this section- Linux, Windows, and FreeBSD share similarities across their individual file system philosophies, but still retain their own distinct differences.
+File systems implemented in each are a common share-point, due to their great fit for their purpose, while at the same time systems like Windows have tools that introduce their own unique functionality.
+We've explored how crucial an efficient filesystem is to an operating system and taken glimpses into their data structures and complex inner-workings.
+As we continue to explore kernel structures within different operating systems more and more will become clear, but for now understanding the file systems serve as an excellent stepping stone on our path.
+
+% @NOTE: SECTION ===============================
+% \section{Topic}
+% \label{sec:Topic}
+%
+% \subsection{FreeBSD}
+% \label{sub:Topic FreeBSD}
+%
+% \subsection{Windows}
+% \label{sub:Topic Windows}
+%
+% \subsection{Compared to Linux}
+% \label{sub:Topic Linux}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

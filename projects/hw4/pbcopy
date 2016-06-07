@@ -1,0 +1,49 @@
+273a274,275
+> 	struct page *best = NULL;
+> 	int curr_diff = 0;
+294a297
+> 		
+296c299,309
+< 			continue;
+---
+> 		        continue;
+> 	
+> 		if (curr_diff == 0) {
+> 			best = sp;
+> 			curr_diff = sp->units - SLOB_UNITS(size);
+> 			//printk(KERN_INFO "first check, found best by default \n");
+> 		} else if (sp->units < SLOB_UNITS(size) && (sp->units - SLOB_UNITS(size)) < curr_diff) {
+> 			best = sp;
+> 			curr_diff = sp->units - SLOB_UNITS(size);
+> 			//printk(KERN_INFO "found best by comparison \n");
+> 		}
+299,302c312,315
+< 		prev = sp->list.prev;
+< 		b = slob_page_alloc(sp, size, align);
+< 		if (!b)
+< 			continue;
+---
+> 		/*prev = sp->list.prev;*/
+> 		/*b = slob_page_alloc(sp, size, align);*/
+> 		/*if (!b)*/
+> 			/*continue;*/
+307,309c320,324
+< 		if (prev != slob_list->prev &&
+< 				slob_list->next != prev->next)
+< 			list_move_tail(slob_list, prev->next);
+---
+> 		/*
+> 		 *if (prev != slob_list->prev &&
+> 		 *                slob_list->next != prev->next)
+> 		 *        list_move_tail(slob_list, prev->next);
+> 		 */
+311a327,335
+> 	
+> 	if (best != NULL) {
+> 		printk(KERN_INFO "placing in best page\n");
+> 		b = slob_page_alloc(best, size, align);
+> 	} else {
+> 		printk(KERN_INFO "allocating new page\n");
+> 		b = NULL;
+> 	}
+> 

@@ -1,0 +1,82 @@
+\documentclass[10pt,draftclsnofoot,onecolumn]{IEEEtran}
+
+\usepackage{setspace}
+% \usepackage{xcolor}
+% \usepackage{caption}
+\usepackage{listings}
+
+\ifCLASSINFOpdf
+  \usepackage[pdftex]{graphicx}
+  \graphicspath{static/}
+  \DeclareGraphicsExtensions{.pdf,.jpeg,.png}
+\fi
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+% listings options
+\lstset{frame=lrbt,xleftmargin=\fboxsep,xrightmargin=-\fboxsep}
+
+\begin{document}
+
+\pagenumbering{gobble}
+\singlespacing
+\title{Project 3}
+
+\author{Ty~Skelton}
+
+% The paper headers
+\markboth{CS 444}%
+{Spring 2016}
+
+% make the title area
+\maketitle
+
+% As a general rule, do not put math, special symbols or citations
+% in the abstract or keywords.
+\begin{abstract}
+In this assignment I will describe how I was able to implement best fit into the slob memory manager.
+I will provide answer to several questions about my process and what I learned, along with logs for work and version control.
+This report is accompanied by a patch file that reflects my changes.
+\end{abstract}
+\IEEEpeerreviewmaketitle
+
+\newpage
+\pagenumbering{arabic}
+
+\tableofcontents
+\newpage
+
+
+\section{I/O Elevators}
+\subsection{Main Point of Assignment}
+The main point of this assignment I believe was to teach us about how memory managers work and to see a \textit{really bad one} in action.
+I had a faint understanding of how pages were implemented and managed when I was doing the assigned readings, but after getting into the slob manager it really demystified a lot for me.
+In reference to my ``really bad one" statement earlier, when using the slob manager I let it boot on it's own without any changes and it just never started.
+So I therefore learned to not take for granted the things modern operating systems are able to pull off.
+
+\subsection{Approach}
+My approach for this assignment was the same as all of the others so far.
+First I made to sure I was able to successfully get into the boot stage with the slob memory manager.
+After that I started to make print statements to see what kind of data I was working with.
+I talked to some other students and got a feel for some problem areas and then started to make meaningful changes.
+Early on I had a lot of issues with getting it to actually work, but I figured out I didn't have a base case for allocating a page when there were none.
+Fixing that meant I was done and it was exciting.
+
+\subsection{Ensuring solution was correct}
+To ensure the solution was correct I used plenty of print statements to tell me through the console when something became a best fit, was default, etc.
+
+\subsection{What was learned}
+I learned that modern operating systems are really well-tuned machines for having such good memory management systems.
+The slob and my variation were both very slow and it seems tough to do this well.
+I learned it wasn't as hard as I thought it was gonna be, but that doesn't mean much because it was still hard.
+Overall I'd say (since this is the last write-up for the class) I learned a lot about kernel development as a whole and have found a higher appreciation for it.
+I do not think I'll ever find myself in this field of work, but I can definitely say I've considered it now.
+
+\section{Version Control Log}
+\input{changelog.tex}
+
+\section{Work Log}
+\input{worklog.tex}
+
+\end{document}

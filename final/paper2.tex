@@ -1,0 +1,287 @@
+
+\subsection{Introduction}
+Handling input and output of information from the central system to its connected devices is a very important aspect in any kernel environment.
+I/O scheduling across devices is handled surprisingly different in Linux, Windows, and FreeBSD.
+Further exploring how I/O is handled between the system and the devices will help us understand the necessary interactions in the operating system that make interconnectivity possible.
+Whether the Operating abstracts out most of the functionality in the attempt at consistent design like Windows, or resting all responsibility on the device drivers itself for implementing a kernel-compliant interface; we'll explore the intricate workings of these systems.
+
+% @NOTE: SECTION ===============================
+\subsection{Scheduling}
+\label{sec:Scheduling}
+\par Block storage devices typically place whatever information it needs to store anywhere that it can fit, which it's important to have an efficient system for reading and writing to that device.
+The first step a system takes before becoming ready to perform IO scheduling is deciding on the right scheduler to use.
+Lucky for most users, personal computers and workstations typically come with the right scheduler configured to provide a smooth user experience.
+However, if the system is handling almost no user interactions or catering to different devices, then it requires a different scheduler to best optimize for that use case.
+Efficiently seeking over storage is important in all regards to energy, efficiency, and speed; this means that scheduling algorithms are very important and leave a lot of room for customization between operating systems.
+
+\subsubsection{FreeBSD}
+\label{sub:Scheduling FreeBSD}
+In FreeBSD, the I/O subsystem is described as a stack \cite{bsd:2}.
+At the very top of the stack exists user requests, while at the very bottom are the actual media devices that service the requests.
+After requests enter the stack at the top they either trickle down to the actual device driver or to the disk via the file system.
+The top half of the stack is where scheduling and data structures are abstracted out to, leaving more hardware-intimate software near the bottom of the stack.
+
+\par Recalling that FreeBSD's I/O system is represented as a stack, the layer that abstracts out as much I/O functionality as it can from the device drivers is called the CAM layer \cite{bsd:1}.
+The CAM layer sits between the GEOM layer and the rest of the lowest-level device drivers.
+CAM stands for Common Access Method.
+The GEOM layer is a modular transformation framework for disk-I/O requests.
+The primary example for tasks extracted out to the CAM layer is the tracking of requests and notifying their respective clients.
+Outside of disks, the CAM layer manages all storage devices connected to the system.
+
+\par Since the concept of a centralized scheduler for I/O is not implemented in FreeBSD, we'll have to glean aspects of what a scheduler does from different components.
+The layer of the I/O stack that offers the most relevant functionality is this CAM layer, which surprisingly sits very close to the physical device layer.
+CAM implements a generalized queueing and error recovery model.
+The three sub-layers within the CAM layer of the I/O stack that offer the functionality we'll explore are the peripheral layer, XPT layer, and the SIM layer.
+
+\par The peripheral sublayer is responsible for the open, close, strategy, attach, and detach operations available to supported devices \cite{bsd:1}.
+This means that the peripheral sublayer handles building I/O specific commands specific to the protocol defined by each device.
+The CAM Transport Layer (XPT) is responsible for scheduling and dispatching I/O commands.
+It's the focal point between all of the peripherals and their adapters.
+Finally, the CAM SIM layer (Software Interface Module) handles routing to the actual devices.
+This layer is adjacent to the device layer, where it will allocate paths to the request device and collect all relevant notifications.
+
+\subsubsection{Windows}
+\label{sub:Scheduling Windows}
+\par I/O scheduling in Windows is taken care of by the I/O manager.
+The I/O manager ``[is] the core of the I/O system, because it defines the orderly framework, or model, within which I/O requests are delivered to device drivers." \cite{win:2}.
+The I/O manager uses a packet driven system, which means I/O requests made in the system are represented as an IRP (I/O Request Packet) that is communicated between components.
+When an IRP is created it is stored in memory and passed to the correct driver.
+Upon completion of request, this packet is destroyed and the space is freed.
+An I/O manager is also responsible for abstracting functionality away from individual drivers, which allows for more light-weight drivers that can rely on the I/O manager for all their I/O interactions.
+
+\par An interesting detail about the I/O manager in Windows is that it provides flexible APIs in order to allow environment subsystems (like Linux) to implement their own I/O operations \cite{win:2}.
+On their way to their respective devices, requests have to pass through several stages of processing.
+These stages vary based on whether or not they were meant for a device that is operated by either a single or multi layered device driver.
+This varies further based on whether or not the request was synchronous or asynchronous.
+
+\par There are four different types of I/O within the Windows kernel: Synchronous \& Asynchronous, Fast I/O, Mapped File I/O, and Scatter/Gather I/O \cite{win:2}.
+While synchronous I/O operations are the default for applications, this mode offers the ability to execute concurrent I/O operations to execute while the main thread of the program continues.
+Synchronous execution would mean that the device blocks until I/O completes, which makes sense for certain programs like video or word processing programs.
+However, the ability to do more at once when applicable can be very appealing to developers.
+Fast I/O is named justly in the fact that it is specially constructed to skip the packet-creation process and shoot the I/O request directly to the device of interest.
+Mapped File I/O is the name for viewing the contents of a storage device/disk in virtual memory.
+This means placing all of the information in a memory mapped array, using the memory paging mechanism to access distinct pages from the file.
+Scatter Gather I/O permits an application to execute a single read/write from one or more buffers in virtual memory to a contiguous area of a file on disk instead of issuing several separate I/O requests per buffer.
+This requires that the file is currently opened for non-cached I/O, the buffers are page-aligned in memory, and the requests are asynchronous.
+
+\par The Plug and Play (PnP) manager is ``the primary component involved in supporting the ability of Windows to recognize and adapt to changing hardware configurations" \cite{win:2}.
+This is to prevent the user having to be able to understand the complex details of managing installing and removing devices from their system.
+An example from the text relays how it's the PnP manager that would allow a system user on a windows laptop to place it into a docking station, detect the devices it's connected to, and then make them available \cite{win:2}.
+This is a very powerful tool and is something that makes Windows very appealing to all desktop users.
+
+\subsubsection{Compared to Linux}
+\label{sub:Scheduling Linux}
+\par We've seen how I/O scheduling in Windows is handled by a request manager and is abstracted out into a stack in FreeBSD, but Linux has it's own way of handling I/O scheduling.
+The Linux kernel actually has a specific I/O scheduler, which works by managing a block device's request queue \cite{linux:1}.
+The I/O scheduler is similar to the process scheduler in that it virtualizes block devices across outstanding I/O requests.
+This scheduler is built on top of the device and has it's own algorithms for deciding what packets get served and when.
+Linux provides different options for I/O schedulers on top of it's block device, among these choices are: anticipatory, deadline, completely fair, and noop schedulers.
+
+\par The anticipatory scheduler introduces a new heuristic for warding off seek-storms, by waiting a brief moment after each operation in case there will be another request to the immediate area.
+This was built on top of the deadline scheduler, which didn't have this functionality and instead had a expiration time on each request to prevent starvation.
+This was an okay approach, but could lead to messy seek process.
+In the completely fair scheduler I/O request priority is based off of the calling process's priority.
+This plays more into the ``fairness" aspect of Linux.
+Finally, the noop scheduler caters to a specialized, but different approach.
+It doesn't provide anything fancy and caters to systems that have truly randomized block storage, where fancy merging isn't quite necessary.
+
+\par In the reading, Linux and FreeBSD both mention block and character devices.
+They both recognize the importance of being able to schedule requests in a way that cater to the primary purpose of the machine- whether it's for batch jobs or user experience.
+However, whereas Windows has a singular abstraction level for handling a majority of I/O request functionality away from the individual devices, each device in Linux and FreeBSD actually has their own.
+So the primary scheduler for processes just allow the drivers their time they need on the CPU to actually communicate from the device to the system.
+
+\par A fundamental system functionality shared between Linux, Windows, and FreeBSD is the process of servicing I/O requests through request queues.
+While they aren't all implemented in the same way, they each have mention and use them to fulfill the same purpose- efficiently handling information communication between devices \cite{bsd:1} \cite{win:2} \cite{linux:1}.
+In Linux specifically, request queues servicing block I/O layers can be found in \texttt{<linux/blkdev.h>}.
+They are a doubly linked list filled with the necessary information to provide a successful request.
+
+
+% @NOTE: SECTION ===============================
+\subsection{Devices}
+\label{sec:Devices}
+\par An ``IO Device" commonly refers to what's called an input/output device.
+An input/output device is any technology that is used by the operator or the system to communicate with the computers storage systems.
+An example of an IO device might be a keyboard plugged into the computer that is being used by the operator to provide input, or a network adapter that we can stream information from.
+In order to communicate with these devices there must be some form of software that allows for both the system and the hardware to recognize each other and translate their requests.
+This software is called a driver and the proceeding subsections will describe how Windows handles them along with the devices themselves.
+
+\subsubsection{FreeBSD}
+\label{sub:Devices FreeBSD}
+\par Device drivers in current FreeBSD systems can be categorized into the following three types: disk management, I/O routing and control, and networking \cite{bsd:1}.
+While I/O routing and control is considerably more relevant to our topic and our primary focus, there are still aspects of I/O required/implemented by disk management and networking.
+Disk management specifically caters to the process of organizing the way disks are partitioned and laid-out in a filesystem.
+I/O device drivers handle I/O requests between the device and the system.
+Network device drivers follow the same vein, although the focus of the device is to offer network connection capabilities, it's still crucial to get data off of the device (I/O).
+
+\par Naming schemes and device access needs to be clearly defined and consistent in order to provide a quality experience when interfacing with different devices.
+In the past, FreeBSD would place static nodes into \texttt{/dev} that would provide access to different devices in the system.
+This was soon changed due to several problems including how nodes would persist even if the device was disconnected, admins needed to explicitly create these nodes when devices were added, etc.
+This system was replaced with a dynamic process that takes place upon boot, which finds devices connected to the system and registers their nodes in the \texttt{DEVFS} filesystem \textit{mounted} on \texttt{/dev}.
+Now only mounted devices will show up in \texttt{/dev}.
+The text points out that one advantage of using the old system was the fact that irregular names could be permitted, which allowed for more flexibility \cite{bsd:1}.
+
+\par In FreeBSD there are three kinds of I/O: the character device, filesystem, and socket interface.
+The character interface is best represented as a byte-stream.
+An example of this is a typical keyboard; Information flows sporadically and at different rates depending on user input, but none of the access to it can be parallelized.
+The filesystem refers to disk devices in the system.
+Disk devices typically represent the bulk physical storage for the system and since information can be laid out in any which way the user wants, it needs to have some level of organization for efficient access.
+Finally, the socket interface is part of the network side of things- allowing data to come in over ports for whatever purposes.
+
+\par The text outlines the structure of a device driver as three main subsections- autoconfiguration and initialization routines, routines for servicing I/O requests (top half), and interrupt service routines (bottom half) \cite{bsd:1}.
+Autoconfiguration is a portion of the driver that is responsible for ``probing" the actual hardware device to see if it's ready to handle communication and interactions.
+The actual routines for servicing I/O that are interfaced with by the scheduler are just that- they go through the device and read/write the specified resource depending on the request.
+Finally, the interrupt service routines are equally as obvious a layer.
+They service whatever interrupt is sent to the device in it's own thread, which is a FreeBSD specific design implementation \cite{bsd:1}.
+
+\subsubsection{Windows}
+\label{sub:Devices Windows}
+\par In order for the system to interact with a particular device that is now connected, there needs to be a way to translate establish recognition and translate communication.
+The most generic classification we can apply to a device driver is whether or not it is a user or kernel-mode driver.
+This subsection primarily focuses on kernel-mode drivers.
+
+\par As soon as a thread opens a file object handle, the I/O manager needs to know what driver is necessary to call so the request to the device can be completed.
+These objects can be either a driver object or a device object \cite{win:2}.
+A driver object is a representation for an individual driver registered in the system, whereas a device object represents a physical or logical device in the system.
+The device object also has attributes that describe its buffers and the location of its queue for IRPs.
+The device object is important, because it serves as the target for all I/O operations and serves as the communication interface.
+As soon as a driver receives and IRP, it will perform the request operation and then pass the reference back to the I/O manager.
+This happens when either the operation was successfully accomplished or it's destination is somewhere else in the system.
+In order to have support for PnP, it must have a dispatch routine (which I'll cover later in this subsection).
+
+\par Windows Driver Model (WDM) refers to a class of drivers that adhere to the Windows model for drivers.
+The text describes WDM drivers as belonging to one of three types: bus drivers, function drivers, and filter drivers \cite{win:2}.
+bus drivers do exactly what you'd expect- they are responsible for managing a logical or physical bus (like USB).
+Function drivers are described in the book as the driver with the most knowledge of the operation of the device \cite{win:2}.
+It does this by exporting the operational interface to the operating system.
+Filter drivers exist in a logical layer either above or below the function or bus drivers.
+This will then change behavior of these devices.
+
+\par Alongside the WDM drivers (bus, function, and filter), support for connected pieces of hardware could be located several drivers in order to run correctly.
+These other drivers can be class drivers, miniclass drivers, or port drivers.
+Class drivers handle all I/O processing for certain types of devices \cite{win:2}.
+These devices can range from keyboard to CD-ROM, which means anything with a standardized interface.
+Miniclass drivers are the same as class drivers only in that they both implement I/O functionality.
+The difference is that miniclass implement \textit{vendor specific} functionality.
+Port drivers handle all processing to a type of port.
+These are almost always created and maintained by Microsoft so that they can keep them standardized.
+
+\begin{figure}[h]
+\begin{lstlisting}
+   lkd> !drvobj \Driver\kbdclass 7
+   Driver object (fffffa800adc2e70) is for:
+    \Driver\kbdclass
+   Driver Extension List: (id , addr)
+
+   Device Object list:
+   fffffa800b04fce0  fffffa800abde560
+
+   DriverEntry:   fffff880071c8ecc  kbdclass!GsDriverEntry
+   DriverStartIo: 00000000
+   DriverUnload:  00000000
+   AddDevice:     fffff880071c53b4  kbdclass!
+
+  Dispatch routines:
+  [00] IRP_MJ_CREATE              fffff880071bedd4  kbdclass!KeyboardClassCreate
+  [01] IRP_MJ_CREATE_NAMED_PIPE   fffff800036abc0c  nt!IopInvalidDeviceRequest
+  [02] IRP_MJ_CLOSE               fffff880071bf17c  kbdclass!KeyboardClassClose
+  [03] IRP_MJ_READ                fffff880071bf804  kbdclass!KeyboardClassRead
+  ...
+  [19] IRP_MJ_QUERY_QUOTA         fffff800036abc0c  nt!IopInvalidDeviceRequest
+  [1a] IRP_MJ_SET_QUOTA           fffff800036abc0c  nt!IopInvalidDeviceRequest
+  [1b] IRP_MJ_PNP                 fffff880071c0368  kbdclass!KeyboardPnP
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  This is the output from inputting a 7 after the driver object's name in the \texttt{!drvobj} kernel debugger command \cite{win:2}.
+  It lists all of the functions defined for its dispatch routines and that this particular driver has 28 IRP types.
+}
+\label{code:dispatch_routine}
+\end{figure}
+
+\par A driver in the Windows kernel has six primary driver routines: initialization, add-device routine, dispatch routine, start I/O routine, interrupt service routine, DPC routine.
+The initialization routine is pretty self-explanatory in that it loads the driver into the operating system.
+The add-device routine is reserved for devices with Plug and Play support.
+Dispatch routines serve as the primary entry points for a device driver, as shown in Figure \ref{code:dispatch_routine}.
+The start I/O routine is used for initiating I/O transfer, but is only used in routines that require the I/O manager to queue their requests.
+The interrupt service routine is the handler for whenever a device interrupts; The kernel's interrupt dispatcher transfers control to this service when the relevant interrupt happens.
+Finally, the DPC routine is what does most of the work after the interrupt is handled.
+After completing an I/O process it will then queue the next I/O operation.
+
+\subsubsection{Compared to Linux}
+\label{sub:Devices Linux}
+\par As mentioned prior within FreeBSD's device subsection, all Unix systems have three classes of devices: block, character, and network.
+Since our focus for this chapter is on block devices, we'll hone in on the block device modules.
+Users are familiar with the description of Linux being ``monolithic" \cite{linux:1}, but that's only in the sense of the address space.
+This contrasts with the fact that Linux is actually very modular- meaning it supports dynamic insertion/removal of code.
+While users can design and develop their own modules or libraries for the Linux kernel, we'll focus on the device models specifically.
+
+\par The device model is a new feature that was introduced in version 2.6.
+It was introduced in an effort towards a unified \textit{device model} \cite{linux:1}.
+This functionality provides a few primary benefits like (among others):
+\begin{list}{-}{}
+\item minimization duplicated code
+\item to provide common facilities
+\item capability to link to other devices
+\item etc.
+\end{list}
+This methodology is shared in philosophy with Windows and FreeBSD, but their implementations are very different.
+Linux has set data structures that are expecting to be interfaced with appropriately with the devices themselves.
+The layout of the data structure for \texttt{struct kobject} is very telling (figure \ref{code:kobject_struct})
+
+\begin{figure}[h]
+\begin{lstlisting}
+  struct kobject {
+          const char              *name;
+          struct list_head        entry;
+          struct kobject          *parent;
+          struct kset             state_initialized:1;
+          struct kobj_type        *kset;
+          struct sysfs_dirent     *ktype;
+          struct kref             *sd;
+          unsigned int            kref;
+          unsigned int            state_in_sysfs:1;
+          unsigned int            state_add_uevent_sent:1;
+          unsigned int            state_remove_uevent_sent:1;
+          unsigned int            uevent_suppress:1;
+  };
+
+  struct cdev {
+          struct kobject                  kobj;
+          struct module                   *owner;
+          const struct file_operations    *ops;
+          struct list_head                list;
+          dev_t                           dev;
+          unsigned int                    count;
+  };
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  The \texttt{kobject} structure provides basic facilities such as a name, a pointer to it's location in sysfs, and a counter.
+  A more interesting structure is the \texttt{cdev} structure.
+  once a \texttt{kobject} is included in the \texttt{cdev} structure, it gains all of it's standardized functions and can become part of an object hierarchy.
+}
+\label{code:kobject_struct}
+\end{figure}
+
+\par The important key to understanding how devices work in Linux is the \texttt{kobject} structure.
+It introduces basic object properties in a standard and unified way.
+They are often times just embedded in other objects, like the \texttt{ksets} sets for aggregational purposes.
+This is a highlighted difference between Linux and FreeBSD/Windows.
+While Windows is very particular about being consistent across devices that interact with its kernel, it doesn't go as far as to define abstract objects and whatever else to interface with those devices.
+Windows does however provide common faculties for use across different devices, but never to that extent.
+
+\par Finally, at the highest level exists the sysfs filesystem.
+the sysfs filesystem is an all in-memory filesystem that provides a topdown view of the entire hierarchy of \texttt{kobject}s \cite{linux:1}.
+Taking advantage of the attributes exposed by the \texttt{kobject}s, the kernel variables can now read/from write to these devices.
+Both FreeBSD and Windows have methods in which they keep track of their existing/running drivers.
+This is an essential part of managing many devices that are all connected to the system, but the sysfs is distinct and interesting due to its layered approach within the Linux system.
+embedding objects into objects over and over is an interesting way to expose functionality to higher levels while keeping references nice and clean.
+
+% @NOTE: SECTION ===============================
+\subsection{Conclusion}
+As we've seen in this subsection- Linux, Windows, and FreeBSD share similarities across their individual I/O philosophies, but still retain their own distinct differences.
+Things like the request queues implemented in each are a common sharepoint, due to their great fit for their purpose, while at the same time systems like Windows have tools like Plug and Play that introduce their own unique functionality.
+We've explored how crucial an efficient I/O system is to an operating system and taken glimpses into their complex inner-workings.
+As we continue to explore kernel structures within different operating systems more and more will become clear, but for now understanding the I/O systems serve as an excellent stepping stone on our path.

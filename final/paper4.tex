@@ -1,0 +1,135 @@
+
+% @NOTE: SECTION ===============================
+\subsection{Introduction}
+\label{sec:Introduction}
+\par Continuing our adventure in comparing different operating systems and their respective kernels will now lead us to explore memory management and the different philosophies and implementations around it.
+The kernel of an operating system is responsible for managing both physical and virtual memory that is available to the system.
+This means having a standardized and consistent approach towards virtualization and memory management as a whole.
+
+% @NOTE: SECTION ===============================
+\subsection{Memory Management}
+\label{sec:Memory Management}
+\par Memory management is a crucial responsibility for ever kernel system, due to physical limitations on the device and the number of concurrent processes contesting for full access.
+The task of dynamically and efficiently allocating memory to different processes is not an easy one, and therefore requires a skillful implementation and understanding.
+How memory is handled is actually surprisingly distinct between the Windows, FreeBSD, and Linux kernels.
+The following subsections will help to further investigate differences in areas such as data structures, paging, address structure, and more.
+
+\subsubsection{Windows}
+\label{sub:Memory Management Windows}
+\par The Windows system is capable of supporting anywhere from 2GB to 2048GB of physical memory \cite{win:2}.
+However, the virtual address space can grow to be as large as 8,192GB on some Windows systems, which outlines a clear necessity for a efficient memory manager to avoid any collisions.
+Outside of strictly managing memory resources, the memory manager for Windows is responsible for a number of other services.
+The text cited in this paper lists some of these services as handling memory mapped files, copy-on-write memory, and support for applications that use large, sparse address spaces \cite{win:2}.
+
+\par The Virtual Address Descriptors (VAD) are represented as a tree structure within Windows, where nodes can be either marked as committed, free, or reserved \cite{win:2}.
+When a node is marked as committed it means that it's currently under use, whereas free and reserved are exactly as they sound.
+Each process within windows is able to have it's own 4GB of virtual address space via paging, where it's divided into upper and lower subsections down the middle \cite{win:2}.
+The upper 2GB is reserved for the Windows kernel mode and the lower 2GB is reserved for the user mode.
+
+\par Windows' paging method is called ``Cluster-Demand" paging \cite{win:2}.
+This means that pages aren't brought into memory until they are required.
+When pages are requested they aren't presented one by one, but rather several at a time.
+This is where the term ``clustering" comes in, because it refers to practice of presenting multiple pages of memory within a subsection at the same time.
+The group sizing is able to be changed to fit the usage of how the user wants.
+Figure \ref{code:determining_pool_sizes} shows us a quick way to determine page pool sizes and amounts.
+
+\begin{figure}[h]
+\begin{lstlisting}
+  kd> !vm
+
+  1: kd> !vm
+
+  *** Virtual Memory Usage ***
+         Physical Memory:      851757 (   3407028 Kb)
+         Page File: \??\C:\pagefile.sys
+           Current:   3407028 Kb  Free Space:   3407024 Kb
+           Minimum:   3407028 Kb  Maximum:      4193280 Kb
+        Available Pages:      699186 (    2796744 Kb)
+        ResAvail Pages:       757454 (    3029816 Kb)
+        Locked IO Pages:           0 (          0 Kb)
+        Free System PTEs:     370673 (    1482692 Kb)
+        ...
+        NonPagedPool Max:     522368 (    2089472 Kb)
+        ...
+        PagedPool Maximum:    523264 (    2093056 Kb)
+        ...
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  While in the debugger, you can use the \texttt{!vm} command to view your paged/nonpaged pool values / maximums with ease \cite{win:2}.
+  There is a GUI for this, but with only terminal access it's important to know information.
+  This example was taken from a 4-GB 32-bit system.
+}
+\label{code:determining_pool_sizes}
+\end{figure}
+
+\subsubsection{FreeBSD}
+\label{sub:Memory Management FreeBSD}
+\par The current system that FreeBSD has implemented for managing it's virtual memory is called the Mach 2.0 virtual memory system \cite{bsd:1}.
+This choice was made due to it's ``efficient support for sharing and a clean separation of machine-independent and machine-dependent features, as well as multiprocessor support" \cite{bsd:1}.
+Once allocated, FreeBSD divides the address space in virtual memory available to a process into two subsections: kernel and user space.
+The kernel space is at the top of the address space, leaving the remaining bottom portion as user space.
+In 32-bit systems the kernel space is set to 1GB in size and can scale to 2GB, whereas in 64-bit systems the kernel space can usually map to the entirety of physical memory.
+
+\par FreeBSD makes use of the working set model for handling a processes pages \cite{bsd:1}.
+The working set model maintains a record of all of the pages that belong to a process and allows them to be pulled up upon request.
+These pages are then built upon hierarchically with different encapsulating data objects, like files or anonymous pieces of swap space \cite{bsd:1}.
+The lowest-level of these objects, which the physical memory as a page in the virtual system, is the \textit{vm\_page}.
+The structure that contains this data structure and others pertaining to machine-dependent/independent structures that describes the current processes' address space is the \textit{vm\_map}.
+The \textit{vm\_map} structure contains lists of \textit{vm\_map\_entry} structures, which points to a chain of \textit{vm\_object} structures, which ultimately contain references to \textit{vm\_page} descriptors.
+
+\par FreeBSD has access to different allocators for the kernel address space.
+The primary ones are the slab allocator, keg allocator, and the zone allocator \cite{bsd:1}.
+The slab refers to a collection of items that are the same size \cite{bsd:1}.
+Since each slab is a multiple of the page size, this means that it scales directly with the number of objects contained within it.
+The keg allocator exists one level higher and instead encapsulates slabs of equal sizes within them.
+This hierarchy is complete with the zone allocator, which is comprised of sets of kegs.
+
+\subsubsection{Compared to Linux}
+\label{sub:Memory Management Linux}
+\par Memory management in the Linux kernel follows a lot of the same principles that we've covered in the Windows and FreeBSD subsections.
+Of the two, however, Linux and Windows have some of the most highlighted differences.
+While the high-level goal of managing and allocating virtual memory over the physical space in the kernel is shared by the three operating systems, they contrast in some interesting areas.
+The main things we're looking at are areas such as data structures, paging, and address structure.
+
+\par Linux's data structures for memory management are implemented in the form of a linked-list \cite{linux:1}.
+This approach is shared by FreeBSD, but contrasted by Windows, which as we covered in subsection \ref{sub:Memory Management Windows} makes use of a tree data structure.
+Whenever the system requests a particular page, it parses over the linked list containing \texttt{vm\_area} structs and locates it.
+What's interesting, however, is that if this list structure reaches a certain size Linux will convert the abstract structure to a tree instead for scalability \cite{linux:1}.
+
+\begin{figure}[h]
+\begin{lstlisting}
+  char *buf;
+
+  buf = vmalloc(16 * PAGE_SIZE); /* get 16 pages */
+
+  if (!buf)
+    /* error! failed to allocate memory */
+
+  vfree(buf);
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  \texttt{vmalloc} is a similar function to \texttt{kmalloc}, but it's used for allocating memory that is only \textit{virtually} contiguous.
+  Above is an example of how to generate a buffer that points to a virtually contiguous block of memory.
+}
+\label{code:vmalloc}
+\end{figure}
+
+\par Like FreeBSD, Linux also has 1GB allocated for kernel mode and 3GB allocated for user mode in memory space.
+Unlike Windows, Linux uses purely demand paging with no pre-paging \cite{linux:1}.
+This is called a ``lazy" system, because it will services page requests and swaps as they come in, rather than taking any initiative.
+Linux pages have an address that is comprised of four parts: the global directory, middle directory, page table, and offset \cite{linux:1}.
+This is a different system from Windows, which makes use of only two things for it's address structure (page number \& offset).
+
+
+
+% @NOTE: SECTION ===============================
+\subsection{Conclusion}
+\label{sec:Conclusion}
+\par As we've seen in this subsection- Linux, Windows, and FreeBSD share similarities across their individual memory management philosophies, but still retain their own distinct differences.
+Memory managers implemented in each are a common share-point, due to their great fit for their purpose, while at the same time systems like Windows have tools that introduce their own unique functionality.
+We've explored how crucial an efficient memory management system is to an operating system and taken glimpses into their paging systems and complex inner-workings.
+As we continue to explore kernel structures within different operating systems more and more will become clear, but for now understanding the memory systems serve as an excellent stepping stone on our path.

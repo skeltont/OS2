@@ -1,0 +1,173 @@
+
+
+\subsection{Processes}
+\label{sec:Processes}
+
+\subsubsection{FreeBSD}
+\label{sub:Process FreeBSD}
+
+\par FreeBSD defines processes as a program in execution.
+The process is initialized with it's own address space that contains mappings of its object code and all global variables.
+The process is also allotted a set of kernel resources, such as its credentials, signal state and descriptor array (for I/O). \cite{bsd:1}
+The processes' data structure must be stored in memory for the duration of it's execution.
+This data structure, however, can be allocated to and freed from memory dynamically as it begins and terminates.
+
+\par In FreeBSD, each process is assigned a unique identifier that is called its PID (Process Identifier) \cite{bsd:1}.
+A running process will only track two PIDs- that of its parent and its own.
+This is stored in the process structure, along with information like: signal state, process tracing information, and timers (both real and CPU-utilization).
+These processes are then filtered into two lists, \textit{zombproc} for ``dead" processes and \textit{allproc} for ``live" ones.
+This functionality is meant for cutting down the amount of work the \textit{wait} system call has to do, along with how many things the scheduler has to scan \cite{bsd:1}.
+
+\subsubsection{Windows}
+\label{sub:Process Windows}
+
+\par Windows processes are also defined as programs in execution.
+The standard data structure for a Windows process is called an EPROCESS.
+Windows tracks running processes with the Process Executive Object Manager.
+It does so by encapsulating the process in a ``process object" \cite{win:1}.
+These structures are stored in system address space and are only accessible from kernel mode.
+Almost all of the process creation takes place in kernel mode, which is Windows' way of preventing injection attacks. \cite{win:1}.
+The only exception to that rule are programs that have been given debug privileges.
+These programs are able to write arbitrary memory, inject code, resume threads, etc. \cite{win:1}
+
+\par Other examples of process-relevant data structures in the Windows kernel are KPROCESS, CSR\_PROCESS, and W32PROCESS.
+The most obvious of these being KPROCESS, which is a kernel process.
+As the name implies, these are only accessible from kernel mode.
+These are the only kind of processes running at the kernel level.
+CSR\_PROCESS contains info specific to the Windows subsystem (Csrss - Client/Server Run-time Subsystem).
+W32PROCESS is a very important kernel level process, because it tracks all pertinent information regarding the window management code and GUI processes.
+
+\subsubsection{Compared to Linux}
+\label{sub:Process Linux}
+
+\par Both Windows and BSD view processes the same way as Linux.
+Linux defines a process as a ``program (object code stored on some media) in the midst of execution" \cite{linux:1}.
+In all three operating systems, processes exist in memory address space and are stored in their respective data structures.
+Both FreeBSD and Linux use very similar data structures for storing process information.
+They each have circular lists that store the PID of a process.
+This differs from Windows, in that Windows uses a priority queue that it pops processes threads in and out of as their priorities change and their their turn arrives for CPU time.
+
+\par Whereas Linux and FreeBSD differentiate processes in user and kernel space differently depending on the permission bestowed on execution, Windows handles this separation with entirely different data structures.
+Windows has two different process data structures for user space and kernel space called EPROCESS (executive process) and KPROCESS (kernel process), respectively.
+Another interesting thing about Windows is that it's kernel is built to help the OS as a work-station type operating system, rather than a headless one.
+This is evident by analyzing the W32PROCESS, which is a process that stores information about window and GUI activity on the machine.
+Linux and FreeBSD can both run without this functionality and only after introducing desktop software does it take advantage of its abstract data structures to make a user-friendly GUI a reality.
+
+\subsection{Threads}
+\label{sec:Threads}
+
+\subsubsection{FreeBSD}
+\label{sub:Thread FreeBSD}
+
+\par In FreeBSD, a thread is referred to as a unit of execution of a process.
+FreeBSD, similar to other distributions, implements the POSIX threading API commonly referred to as Pthreads.
+If the operating system is installed on a multiprocessor, then it would permit multiple threads belonging to the same or different processes to execute concurrently.
+CPU time is allocated to threads based on their priority, just like how processes are within the FreeBSD kernel.
+This is coupled with their ``timeshare class", which is based on its resource usage and CPU usage \cite{bsd:1}.
+Threads require an address space and other resources, but the resources provided can have shared access among other threads \cite{bsd:1}.
+
+\par Threads are able to execute in either \textit{user mode} or \textit{kernel mode}.
+User mode executes the program with a lower set of permissions and less access to the hardware and the kernel's internal functions.
+Kernel mode is the opposite, where it is executed with heightened permissions and a potential shoot-yourself-in-the foot level of access to the hardware and kernel resources.
+By default, threads within FreeBSD share all of the resources of their calling process, including the PID.
+
+\subsubsection{Windows}
+\label{sub:Thread Windows}
+
+\par At a very high level, windows views threads very similarly to Unix.
+From the reading, Windows describes a thread as ``[a] process that Windows schedules for execution" \cite{win:1}.
+The data structure for a thread in Windows is referred to as an ETHREAD.
+Like an EPROCESS (Windows process structure) all ETHREADS are stored in system address space.
+A process can have many threads, but the initial ETHREAD is the primary executive thread for the process.
+
+\par Threads in Windows have associated priorities that dictate their share of the CPU (or Quantum) by the scheduler.
+We'll get into the Windows scheduler in the next subsection, but the interesting mechanic it implements to calculate a threads priority is called a boost.
+A ``boost" is effectively a reason to give a thread priority based on the input it requires at that moment in execution.
+There are a number of reason to boost a thread's priority, such as: scheduler events, I/O completion, UI input, waiting on a resource for too long, and ignored for too long.
+Basically, this means that when something a thread is waiting on occurs or hasn't occurred for some time, that thread is promoted in priority to make the user experience more ergonomic.
+
+\par Thread pools are a mechanism that Windows recently transitioned from being a user implemented tool to being completely managed by the kernel.
+This change is due to the fact that the kernel allowed to directly manipulate thread creation, scheduling, and termination \cite{win:1}.
+This allows the users program code to generate a worker pool through a simple API call, rather than managing virtual memory.
+
+\subsubsection{Compared to Linux}
+\label{sub:Process Linux}
+
+\par Just like in FreeBSD, Linux allows the creation of threads within a process in the user space.
+This differs from Windows, where the kernel handles all threads in worker pools and doles them out via API calls.
+Multiprogramming and threads are handled almost the exact same way in FreeBSD and Linux.
+Runnable threads are stored in "run queues" \cite{bsd:1} \cite{linux:1}, which is interacted with by calls to \textit{runq\_add()} and \textit{runq\_remove} based on priority of the process.
+In linux, forks are almost identical to threads outside of a single flag passed to the \textit{clone()} function.
+This extra flag allows resources to be shared, like the address space, file system resources, file descriptors, and signal handlers \cite{linux:1}.
+FreeBSD tries to mimic this functionality with a call to \textit{pthread\_create()} when it wants a lightweight thread that shares resources.
+Windows handles thread creation in the kernel with a call to \textit{PsCreateSystemThread} and a pointer to that thread is returned.
+
+\par Another major difference between Linux and Windows, is how runnable threads are stored outside of their allotted CPU share.
+Windows implements a priority queue that is maintained by the Windows scheduler.
+Threads placed in the queue are done so after calculating their position based on a number of potentially relevant ``boosts".
+These boosts differ from Linux in how they're several distinct factors for consideration when calculating priority, while Linux primarily focuses on an interactivity score.
+FreeBSD and Linux share this approach by focusing on this interactivity score to provide a smooth user experience.
+This is reflected in their data structure monitored by their scheduler, which is formatted as a linked list.
+
+\subsection{CPU Scheduling}
+\label{sec:CPU Scheduling}
+
+\subsubsection{FreeBSD}
+\label{sub:CPU Scheduling FreeBSD}
+
+\par Processes require access to system resources like memory and CPU power.
+The way the FreeBSD provides concurrent access to these resources to any number of running processes is through the use of a scheduler.
+FreeBSD's default scheduler is called the timeshare scheduler.
+The scheduler calculates a process' priority based on: CPU time used so far, amount of memory reserved for execution, and other factors.
+\par In FreeBSD's timeshare scheduler exists a global list monitored by the scheduler that consists of runnable threads.
+These threads and processes are the ``live" ones mentioned earlier in subsection \ref{sec:Processes}.
+To prevent spending more time on context switching than actual process execution timeshares, the number of running processes must be capped at some point.
+\par For usability purposes, the FreeBSD timeshare scheduler implements a policy that favors interactive programs over other pure-processor based processes \cite{bsd:1}.
+Every thread has an ``interactivity score" that is calculated by the scheduler and results in a number from 0 to 100.
+The interactivity threshold that is compared against for a thread or processes interactivity rating is calculated through ``nice" values to make sure batch processes still get to run.
+This means that the cpu will attempt to handle any computation requested user interaction to ensure a smooth user experience.
+\par Scheduling in FreeBSD is broken down into two parts: a simpler low-level scheduler that runs very often and a more powerful high-level scheduler that runs only a couple times per second \cite{bsd:1}.
+The low-level scheduler handles whenever processes or threads block and another needs to be ran.
+To simplify the decision making process for which goes when, the kernel keeps track of a run queue for each CPU sorted by priority.
+
+\subsubsection{Windows}
+\label{sub:CPU Scheduling Windows}
+
+\par Process scheduling in Windows typically occurs at the thread level for desktop workstations, referred to in subsection \ref{sub:Thread Windows}.
+Multi-user multi-processor is more for cluster environments, with batch computing and shared access.
+This done through priority calculations based on the current need of a thread or process.
+Scheduling at the thread-level is acceptable for legacy and single user machines, but for systems that cater to several competing users and utilize many CPUs it's not the answer.
+Windows system for distributed fair share scheduling between multiple users is done through the session-based Distributed Fair Share Scheduler (DFSS).
+A standard DFSS initialization set's the session's weight to 5, but this value can be anywhere between 1 to 9 \cite{win:1}.
+This is what weight limits and throttles thread activity per session.
+
+\par revisiting the more typical thread scheduling, one can see that Windows system for scheduling them is quite intuitive.
+Threads that are set to be executed are queued up by priority.
+The ready threads in the queue are stored in a data structure called the Dispatcher Database.
+When it's time to pop a thread out of the queue, it's set to a ``running" state and stays that way for its reserved quantum of execution.
+When the its share of CPU is up, then it will go back into the queue.
+Since this queue is based on priority, it's important that no threads get starved and this is accomplished via the ``boosting" technique covered in subsection \ref{sub:Thread Windows}.
+
+\subsubsection{Compared to Linux}
+\label{sub:Sub Processes Linux}
+\par The Linux scheduler is called the \textit{Completely Fair Scheduler}.
+Policy is generally dictated outside of the scheduling technology as an after-thought, but the CFS was obviously built with it in mind.
+The goal of this scheduler is to evenly distribute compute time between different processes and threads so that everyone got their fair share \cite{linux:1}.
+The primary exception to this rule is an ``interactivity score", which gives priority to programs with high user interaction to provide a smooth user experience.
+It also takes into account a process' given \textit{nice} score.
+A high nice value says you're willing to surrender cpu time to other processes that need it more, whereas a lower one tells the processor to give you any extra.
+
+\par The Linux scheduler differs from Windows in several ways and FreeBSD's ULE scheduler in less ways (a noticeable pattern).
+One of the things these three operating systems schedulers have in common is they're all preemptive.
+This means the highest priority process will always run.
+Some of the ways the Windows scheduler differs is in it's usage of boosts (covered in subsection \ref{sub:Thread Windows}), the Dispatcher Database data structure, and it's different thread states.
+The dispatcher database is a data structure that tracks which threads are ready and waiting to execute.
+Windows allows for the possibility to have one Dispatcher Database per processor to improve scalability.
+
+\par The Linux kernel places process in 3 different potential states. TASK\_RUNNING, TASK\_INTERRUPTIBLE, or TASK\_UNINTERRUPTIBLE.
+This differs with the Windows Scheduler, in that they've many more states: Init, Ready, Running, Standby, Terminate, Waiting, Transition, and Deferred Ready \cite{win:1}.
+The least obvious of these are the Transition and Deferred Ready.
+Transition state means the thread is ready for execution, but the kernel stack is paged out of memory.
+Once the kernel stack is back in memory, it will go back to being Ready.
+Deferred Ready means this thread was scheduled for a particular processor, but it's currently busy.
+The benefit to this structure is definitely the more descriptive labels for statuses, but it is definitely less abstract than the Linux/FreeBSD implementation.

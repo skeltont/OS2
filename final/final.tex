@@ -1,0 +1,728 @@
+\documentclass[10pt,draftclsnofoot,onecolumn]{IEEEtran}
+
+\usepackage{setspace}
+\usepackage{listings}
+\usepackage{cite}
+\usepackage{caption}
+
+% set syntax highlighting for listings
+\lstset{language=C}
+\lstset{frame=lrbt,xleftmargin=\fboxsep,xrightmargin=-\fboxsep}
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+\begin{document}
+
+\pagenumbering{gobble} % hide page number on first page
+\singlespacing % set spacing
+\title{Operating System Feature Comparison}
+
+\author{Ty~Skelton}
+
+% make the title area
+\maketitle
+
+\begin{abstract}
+As part of the Operating Systems 2 program at Oregon State, we're to compare and contrast the FreeBSD and Windows operating systems against that of Linux.
+This effort is made in order to develop critically necessary technical writing skills that we'll be required to have immediately in our careers, either in the workforce or in research.
+To that end, I've compiled a document of four out of five of our assigned writing assignments covering a range of topics from Process \& Threads, Scheduling, Interrupts, Memory Management, etc.
+This document has been altered to reflect feedback from our TA and the original documents have been included at the end for instructor comparison.
+The findings of this paper have been almost entirely derived from the readings assigned in class.
+\end{abstract}
+
+\begin{center}
+\scshape % Small caps
+CS444 - Operating Systems 2 \\  % Course
+Spring Term\\[\baselineskip]    % Term
+Oregon State University\par     % Location
+\end{center}
+
+\IEEEpeerreviewmaketitle
+
+\newpage
+\pagenumbering{arabic}
+\tableofcontents
+\newpage
+
+% @NOTE: SECTION ===============================
+\section{Introduction}
+\label{sec:Introduction}
+\par In today's day and age it's a user's market for whatever operating system they prefer to use.
+Sure, there are occasional hang ups with dependencies and requirements that don't translate between systems, but for the most part of common computer usage the choice of system is left to the user.
+At that point for someone like a developer, administrator, or overall power-user it's important to understand the fundamental differences between them.
+During the course of this operating systems class we've read, learned, and written a lot regarding these differences and similarities and it's definitely help to gain a better understanding the systems we use every day.
+In the coming sections we'll cover some interesting details about the operating systems FreeBSD and Windows and compare and contrast them with that of Linux.
+We'll cover exciting topics like process behavior, CPU scheduling, device interfaces, etc.
+
+
+% @NOTE: SECTION ===============================
+\section{Windows}
+
+\subsubsection{Processes}
+\label{sub:Process Windows}
+\par Windows processes are also defined as programs in execution.
+The standard data structure for a Windows process is called an EPROCESS.
+Windows tracks running processes with the Process Executive Object Manager.
+It does so by encapsulating the process in a ``process object" \cite{win:1}.
+These structures are stored in system address space and are only accessible from kernel mode.
+Almost all of the process creation takes place in kernel mode, which is Windows' way of preventing injection attacks. \cite{win:1}.
+The only exception to that rule are programs that have been given debug privileges.
+These programs are able to write arbitrary memory, inject code, resume threads, etc. \cite{win:1}
+
+\par Other examples of process-relevant data structures in the Windows kernel are KPROCESS, CSR\_PROCESS, and W32PROCESS.
+The most obvious of these being KPROCESS, which is a kernel process.
+As the name implies, these are only accessible from kernel mode.
+These are the only kind of processes running at the kernel level.
+CSR\_PROCESS contains info specific to the Windows subsystem (Csrss - Client/Server Run-time Subsystem).
+W32PROCESS is a very important kernel level process, because it tracks all pertinent information regarding the window management code and GUI processes.
+
+\subsubsection{Threads}
+\label{sub:Thread Windows}
+\par At a very high level, windows views threads very similarly to Unix.
+From the reading, Windows describes a thread as ``[a] process that Windows schedules for execution" \cite{win:1}.
+The data structure for a thread in Windows is referred to as an ETHREAD.
+Like an EPROCESS (Windows process structure) all ETHREADS are stored in system address space.
+A process can have many threads, but the initial ETHREAD is the primary executive thread for the process.
+
+\par Threads in Windows have associated priorities that dictate their share of the CPU (or Quantum) by the scheduler.
+We'll get into the Windows scheduler in the next subsection, but the interesting mechanic it implements to calculate a threads priority is called a boost.
+A ``boost" is effectively a reason to give a thread priority based on the input it requires at that moment in execution.
+There are a number of reason to boost a thread's priority, such as: scheduler events, I/O completion, UI input, waiting on a resource for too long, and ignored for too long.
+Basically, this means that when something a thread is waiting on occurs or hasn't occurred for some time, that thread is promoted in priority to make the user experience more ergonomic.
+
+\par Thread pools are a mechanism that Windows recently transitioned from being a user implemented tool to being completely managed by the kernel.
+This change is due to the fact that the kernel allowed to directly manipulate thread creation, scheduling, and termination \cite{win:1}.
+This allows the users program code to generate a worker pool through a simple API call, rather than managing virtual memory.
+
+\subsubsection{CPU Scheduling}
+\label{sub:CPU Scheduling Windows}
+\par Process scheduling in Windows typically occurs at the thread level for desktop workstations, referred to in subsection \ref{sub:Thread Windows}.
+Multi-user multi-processor is more for cluster environments, with batch computing and shared access.
+This done through priority calculations based on the current need of a thread or process.
+Scheduling at the thread-level is acceptable for legacy and single user machines, but for systems that cater to several competing users and utilize many CPUs it's not the answer.
+Windows system for distributed fair share scheduling between multiple users is done through the session-based Distributed Fair Share Scheduler (DFSS).
+A standard DFSS initialization set's the session's weight to 5, but this value can be anywhere between 1 to 9 \cite{win:1}.
+This is what weight limits and throttles thread activity per session.
+
+\par revisiting the more typical thread scheduling, one can see that Windows system for scheduling them is quite intuitive.
+Threads that are set to be executed are queued up by priority.
+The ready threads in the queue are stored in a data structure called the Dispatcher Database.
+When it's time to pop a thread out of the queue, it's set to a ``running" state and stays that way for its reserved quantum of execution.
+When the its share of CPU is up, then it will go back into the queue.
+Since this queue is based on priority, it's important that no threads get starved and this is accomplished via the ``boosting" technique covered in subsection \ref{sub:Thread Windows}.
+
+\subsubsection{I/O Scheduling}
+\label{sub:IOScheduling Windows}
+\par I/O scheduling in Windows is taken care of by the I/O manager.
+The I/O manager ``[is] the core of the I/O system, because it defines the orderly framework, or model, within which I/O requests are delivered to device drivers." \cite{win:2}.
+The I/O manager uses a packet driven system, which means I/O requests made in the system are represented as an IRP (I/O Request Packet) that is communicated between components.
+When an IRP is created it is stored in memory and passed to the correct driver.
+Upon completion of request, this packet is destroyed and the space is freed.
+An I/O manager is also responsible for abstracting functionality away from individual drivers, which allows for more light-weight drivers that can rely on the I/O manager for all their I/O interactions.
+
+\par An interesting detail about the I/O manager in Windows is that it provides flexible APIs in order to allow environment subsystems (like Linux) to implement their own I/O operations \cite{win:2}.
+On their way to their respective devices, requests have to pass through several stages of processing.
+These stages vary based on whether or not they were meant for a device that is operated by either a single or multi layered device driver.
+This varies further based on whether or not the request was synchronous or asynchronous.
+
+\par There are four different types of I/O within the Windows kernel: Synchronous \& Asynchronous, Fast I/O, Mapped File I/O, and Scatter/Gather I/O \cite{win:2}.
+While synchronous I/O operations are the default for applications, this mode offers the ability to execute concurrent I/O operations to execute while the main thread of the program continues.
+Synchronous execution would mean that the device blocks until I/O completes, which makes sense for certain programs like video or word processing programs.
+However, the ability to do more at once when applicable can be very appealing to developers.
+Fast I/O is named justly in the fact that it is specially constructed to skip the packet-creation process and shoot the I/O request directly to the device of interest.
+Mapped File I/O is the name for viewing the contents of a storage device/disk in virtual memory.
+This means placing all of the information in a memory mapped array, using the memory paging mechanism to access distinct pages from the file.
+Scatter Gather I/O permits an application to execute a single read/write from one or more buffers in virtual memory to a contiguous area of a file on disk instead of issuing several separate I/O requests per buffer.
+This requires that the file is currently opened for non-cached I/O, the buffers are page-aligned in memory, and the requests are asynchronous.
+
+\par The Plug and Play (PnP) manager is ``the primary component involved in supporting the ability of Windows to recognize and adapt to changing hardware configurations" \cite{win:2}.
+This is to prevent the user having to be able to understand the complex details of managing installing and removing devices from their system.
+An example from the text relays how it's the PnP manager that would allow a system user on a windows laptop to place it into a docking station, detect the devices it's connected to, and then make them available \cite{win:2}.
+This is a very powerful tool and is something that makes Windows very appealing to all desktop users.
+
+\subsubsection{Devices}
+\label{sub:Devices Windows}
+\par In order for the system to interact with a particular device that is now connected, there needs to be a way to translate establish recognition and translate communication.
+The most generic classification we can apply to a device driver is whether or not it is a user or kernel-mode driver.
+This subsection primarily focuses on kernel-mode drivers.
+
+\par As soon as a thread opens a file object handle, the I/O manager needs to know what driver is necessary to call so the request to the device can be completed.
+These objects can be either a driver object or a device object \cite{win:2}.
+A driver object is a representation for an individual driver registered in the system, whereas a device object represents a physical or logical device in the system.
+The device object also has attributes that describe its buffers and the location of its queue for IRPs.
+The device object is important, because it serves as the target for all I/O operations and serves as the communication interface.
+As soon as a driver receives and IRP, it will perform the request operation and then pass the reference back to the I/O manager.
+This happens when either the operation was successfully accomplished or it's destination is somewhere else in the system.
+In order to have support for PnP, it must have a dispatch routine (which I'll cover later in this subsection).
+
+\par Windows Driver Model (WDM) refers to a class of drivers that adhere to the Windows model for drivers.
+The text describes WDM drivers as belonging to one of three types: bus drivers, function drivers, and filter drivers \cite{win:2}.
+bus drivers do exactly what you'd expect- they are responsible for managing a logical or physical bus (like USB).
+Function drivers are described in the book as the driver with the most knowledge of the operation of the device \cite{win:2}.
+It does this by exporting the operational interface to the operating system.
+Filter drivers exist in a logical layer either above or below the function or bus drivers.
+This will then change behavior of these devices.
+
+\par Alongside the WDM drivers (bus, function, and filter), support for connected pieces of hardware could be located several drivers in order to run correctly.
+These other drivers can be class drivers, miniclass drivers, or port drivers.
+Class drivers handle all I/O processing for certain types of devices \cite{win:2}.
+These devices can range from keyboard to CD-ROM, which means anything with a standardized interface.
+Miniclass drivers are the same as class drivers only in that they both implement I/O functionality.
+The difference is that miniclass implement \textit{vendor specific} functionality.
+Port drivers handle all processing to a type of port.
+These are almost always created and maintained by Microsoft so that they can keep them standardized.
+
+\begin{figure}[h]
+\begin{lstlisting}
+ lkd> !drvobj \Driver\kbdclass 7
+ Driver object (fffffa800adc2e70) is for:
+  \Driver\kbdclass
+ Driver Extension List: (id , addr)
+
+ Device Object list:
+ fffffa800b04fce0  fffffa800abde560
+
+ DriverEntry:   fffff880071c8ecc  kbdclass!GsDriverEntry
+ DriverStartIo: 00000000
+ DriverUnload:  00000000
+ AddDevice:     fffff880071c53b4  kbdclass!
+
+Dispatch routines:
+[00] IRP_MJ_CREATE              fffff880071bedd4  kbdclass!KeyboardClassCreate
+[01] IRP_MJ_CREATE_NAMED_PIPE   fffff800036abc0c  nt!IopInvalidDeviceRequest
+[02] IRP_MJ_CLOSE               fffff880071bf17c  kbdclass!KeyboardClassClose
+[03] IRP_MJ_READ                fffff880071bf804  kbdclass!KeyboardClassRead
+...
+[19] IRP_MJ_QUERY_QUOTA         fffff800036abc0c  nt!IopInvalidDeviceRequest
+[1a] IRP_MJ_SET_QUOTA           fffff800036abc0c  nt!IopInvalidDeviceRequest
+[1b] IRP_MJ_PNP                 fffff880071c0368  kbdclass!KeyboardPnP
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  This is the output from inputting a 7 after the driver object's name in the \texttt{!drvobj} kernel debugger command \cite{win:2}.
+  It lists all of the functions defined for its dispatch routines and that this particular driver has 28 IRP types.
+}
+\label{code:dispatch_routine}
+\end{figure}
+
+\par A driver in the Windows kernel has six primary driver routines: initialization, add-device routine, dispatch routine, start I/O routine, interrupt service routine, DPC routine.
+The initialization routine is pretty self-explanatory in that it loads the driver into the operating system.
+The add-device routine is reserved for devices with Plug and Play support.
+Dispatch routines serve as the primary entry points for a device driver, as shown in Figure \ref{code:dispatch_routine}.
+The start I/O routine is used for initiating I/O transfer, but is only used in routines that require the I/O manager to queue their requests.
+The interrupt service routine is the handler for whenever a device interrupts; The kernel's interrupt dispatcher transfers control to this service when the relevant interrupt happens.
+Finally, the DPC routine is what does most of the work after the interrupt is handled.
+After completing an I/O process it will then queue the next I/O operation.
+
+\subsubsection{Interrupts}
+\label{sub:Interrupts Windows}
+\par As one would expect, Windows supports both hardware and software interrupts.
+From the text, it notes that hardware interrupts typically stem from I/O devices that request service from the processor \cite{win:1}.
+It then begins the I/O transfer, allowing the calling thread to continue it's processing until finished when it will then issue another interrupt signaling it's completed it's I/O operations.
+These kinds of devices include keyboards, drives, and networks.
+Software Interrupts do not stem from any device, but instead some kind of running process or thread.
+This allows the kernel to asynchronously break into the running thread and, for example, throw an exception \cite{win:1}.
+
+\par Interrupt ``trap handlers"" are Windows' method for responding to device interrupts \cite{win:1}.
+An interrupt trap handler then refers to either an external or internal (relative to the device) ISR for further processing.
+An ISR (Interrupt Service Routine) is a handler for a particular interrupt.
+Typically the device driver itself handles the ISR, while the kernel does have abstract routines for handling different interrupts.
+
+\par When processing hardware interrupts, the external I/O interrupts are delivered through an interrupt controller \cite{win:1}.
+As the processor is interrupted, it then reflects this request back to the controller for access to the IRQ.
+This is a crucial step, because the particular IRQ that is required is then translated into a ``interrupt number" that is then used as an index in the \textit{interrupt dispatch table} (or IDT) \cite{win:1}.
+After a successful lookup to the IDT, control is passed to the corresponding interrupt dispatch routine.
+
+\par This concept of an IDT is interesting and unique to the windows kernel.
+Not only does it map hardware IRQs to IDT numbers, but it even has entries for trap handlers for exceptions \cite{win:1}.
+An example of this functionality is provided by the text cited in this paper, which describes the entry for the x86 and x64 exception number for a page fault \cite{win:1}.
+The main takeaway for this tooling in the Windows kernel system for interrupts is that not only can it's interrupt routine lookup-table capable of relaying mappings for hardware originating interrupts, but also from software (exceptions).
+An example of this table's structure is provided in Figure \ref{code:idt_sample}
+
+\begin{figure}[h]
+\begin{lstlisting}
+lkd> !idt
+Dumping IDT:
+   00:    fffff80001a7ec40 nt!KiDivideErrorFault
+   01:    fffff80001a7ed40 nt!KiDebugTrapOrFault
+   02:    fffff80001a7ef00 nt!KiNmiInterrupt    Stack = 0xFFFFF80001865000
+   03:    fffff80001a7f280 nt!KiBreakpointTrap
+   04:    fffff80001a7f380 nt!KiOverflowTrap
+   05:    fffff80001a7f480 nt!KiBoundFault
+   ...
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  The IDT contains mappings for both hardware and software trap handlers for specific interrupts.
+  Windows caps the IDT to 256 entries, but ultimately corresponds to the design of the interrupt controller.
+  This sample shows the output from the command \texttt{!dt} when in the kernel debugger, which is simplified output.
+}
+\label{code:idt_sample}
+\end{figure}
+
+\subsubsection{Memory Management}
+\label{sub:Memory Management Windows}
+\par The Windows system is capable of supporting anywhere from 2GB to 2048GB of physical memory \cite{win:2}.
+However, the virtual address space can grow to be as large as 8,192GB on some Windows systems, which outlines a clear necessity for a efficient memory manager to avoid any collisions.
+Outside of strictly managing memory resources, the memory manager for Windows is responsible for a number of other services.
+The text cited in this paper lists some of these services as handling memory mapped files, copy-on-write memory, and support for applications that use large, sparse address spaces \cite{win:2}.
+
+\par The Virtual Address Descriptors (VAD) are represented as a tree structure within Windows, where nodes can be either marked as committed, free, or reserved \cite{win:2}.
+When a node is marked as committed it means that it's currently under use, whereas free and reserved are exactly as they sound.
+Each process within windows is able to have it's own 4GB of virtual address space via paging, where it's divided into upper and lower subsections down the middle \cite{win:2}.
+The upper 2GB is reserved for the Windows kernel mode and the lower 2GB is reserved for the user mode.
+
+\par Windows' paging method is called ``Cluster-Demand" paging \cite{win:2}.
+This means that pages aren't brought into memory until they are required.
+When pages are requested they aren't presented one by one, but rather several at a time.
+This is where the term ``clustering" comes in, because it refers to practice of presenting multiple pages of memory within a subsection at the same time.
+The group sizing is able to be changed to fit the usage of how the user wants.
+Figure \ref{code:determining_pool_sizes} shows us a quick way to determine page pool sizes and amounts.
+
+\begin{figure}[h]
+\begin{lstlisting}
+  kd> !vm
+
+  1: kd> !vm
+
+  *** Virtual Memory Usage ***
+         Physical Memory:      851757 (   3407028 Kb)
+         Page File: \??\C:\pagefile.sys
+           Current:   3407028 Kb  Free Space:   3407024 Kb
+           Minimum:   3407028 Kb  Maximum:      4193280 Kb
+        Available Pages:      699186 (    2796744 Kb)
+        ResAvail Pages:       757454 (    3029816 Kb)
+        Locked IO Pages:           0 (          0 Kb)
+        Free System PTEs:     370673 (    1482692 Kb)
+        ...
+        NonPagedPool Max:     522368 (    2089472 Kb)
+        ...
+        PagedPool Maximum:    523264 (    2093056 Kb)
+        ...
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  While in the debugger, you can use the \texttt{!vm} command to view your paged/nonpaged pool values / maximums with ease \cite{win:2}.
+  There is a GUI for this, but with only terminal access it's important to know information.
+  This example was taken from a 4-GB 32-bit system.
+}
+\label{code:determining_pool_sizes}
+\end{figure}
+
+% @NOTE: SECTION ===============================
+\section{FreeBSD}
+
+\subsubsection{Processes}
+\label{sub:Process FreeBSD}
+\par FreeBSD defines processes as a program in execution.
+The process is initialized with it's own address space that contains mappings of its object code and all global variables.
+The process is also allotted a set of kernel resources, such as its credentials, signal state and descriptor array (for I/O). \cite{bsd:1}
+The processes' data structure must be stored in memory for the duration of it's execution.
+This data structure, however, can be allocated to and freed from memory dynamically as it begins and terminates.
+
+\par In FreeBSD, each process is assigned a unique identifier that is called its PID (Process Identifier) \cite{bsd:1}.
+A running process will only track two PIDs- that of its parent and its own.
+This is stored in the process structure, along with information like: signal state, process tracing information, and timers (both real and CPU-utilization).
+These processes are then filtered into two lists, \textit{zombproc} for ``dead" processes and \textit{allproc} for ``live" ones.
+This functionality is meant for cutting down the amount of work the \textit{wait} system call has to do, along with how many things the scheduler has to scan \cite{bsd:1}.
+
+\subsubsection{Threads}
+\label{sub:Thread FreeBSD}
+\par In FreeBSD, a thread is referred to as a unit of execution of a process.
+FreeBSD, similar to other distributions, implements the POSIX threading API commonly referred to as Pthreads.
+If the operating system is installed on a multiprocessor, then it would permit multiple threads belonging to the same or different processes to execute concurrently.
+CPU time is allocated to threads based on their priority, just like how processes are within the FreeBSD kernel.
+This is coupled with their ``timeshare class", which is based on its resource usage and CPU usage \cite{bsd:1}.
+Threads require an address space and other resources, but the resources provided can have shared access among other threads \cite{bsd:1}.
+
+\par Threads are able to execute in either \textit{user mode} or \textit{kernel mode}.
+User mode executes the program with a lower set of permissions and less access to the hardware and the kernel's internal functions.
+Kernel mode is the opposite, where it is executed with heightened permissions and a potential shoot-yourself-in-the foot level of access to the hardware and kernel resources.
+By default, threads within FreeBSD share all of the resources of their calling process, including the PID.
+
+\subsubsection{CPU Scheduling}
+\label{sub:CPU Scheduling FreeBSD}
+\par Processes require access to system resources like memory and CPU power.
+The way the FreeBSD provides concurrent access to these resources to any number of running processes is through the use of a scheduler.
+FreeBSD's default scheduler is called the timeshare scheduler.
+The scheduler calculates a process' priority based on: CPU time used so far, amount of memory reserved for execution, and other factors.
+
+\par In FreeBSD's timeshare scheduler exists a global list monitored by the scheduler that consists of runnable threads.
+These threads and processes are the ``live" ones mentioned earlier in subsection \ref{sec:Processes}.
+To prevent spending more time on context switching than actual process execution timeshares, the number of running processes must be capped at some point.
+
+\par For usability purposes, the FreeBSD timeshare scheduler implements a policy that favors interactive programs over other pure-processor based processes \cite{bsd:1}.
+Every thread has an ``interactivity score" that is calculated by the scheduler and results in a number from 0 to 100.
+The interactivity threshold that is compared against for a thread or processes interactivity rating is calculated through ``nice" values to make sure batch processes still get to run.
+This means that the cpu will attempt to handle any computation requested user interaction to ensure a smooth user experience.
+
+\par Scheduling in FreeBSD is broken down into two parts: a simpler low-level scheduler that runs very often and a more powerful high-level scheduler that runs only a couple times per second \cite{bsd:1}.
+The low-level scheduler handles whenever processes or threads block and another needs to be ran.
+To simplify the decision making process for which goes when, the kernel keeps track of a run queue for each CPU sorted by priority.
+
+\subsubsection{I/O Scheduling}
+\label{sub:IOScheduling FreeBSD}
+In FreeBSD, the I/O subsystem is described as a stack \cite{bsd:2}.
+At the very top of the stack exists user requests, while at the very bottom are the actual media devices that service the requests.
+After requests enter the stack at the top they either trickle down to the actual device driver or to the disk via the file system.
+The top half of the stack is where scheduling and data structures are abstracted out to, leaving more hardware-intimate software near the bottom of the stack.
+
+\par Recalling that FreeBSD's I/O system is represented as a stack, the layer that abstracts out as much I/O functionality as it can from the device drivers is called the CAM layer \cite{bsd:1}.
+The CAM layer sits between the GEOM layer and the rest of the lowest-level device drivers.
+CAM stands for Common Access Method.
+The GEOM layer is a modular transformation framework for disk-I/O requests.
+The primary example for tasks extracted out to the CAM layer is the tracking of requests and notifying their respective clients.
+Outside of disks, the CAM layer manages all storage devices connected to the system.
+
+\par Since the concept of a centralized scheduler for I/O is not implemented in FreeBSD, we'll have to glean aspects of what a scheduler does from different components.
+The layer of the I/O stack that offers the most relevant functionality is this CAM layer, which surprisingly sits very close to the physical device layer.
+CAM implements a generalized queueing and error recovery model.
+The three sub-layers within the CAM layer of the I/O stack that offer the functionality we'll explore are the peripheral layer, XPT layer, and the SIM layer.
+
+\par The peripheral sublayer is responsible for the open, close, strategy, attach, and detach operations available to supported devices \cite{bsd:1}.
+This means that the peripheral sublayer handles building I/O specific commands specific to the protocol defined by each device.
+The CAM Transport Layer (XPT) is responsible for scheduling and dispatching I/O commands.
+It's the focal point between all of the peripherals and their adapters.
+Finally, the CAM SIM layer (Software Interface Module) handles routing to the actual devices.
+This layer is adjacent to the device layer, where it will allocate paths to the request device and collect all relevant notifications.
+
+\subsubsection{Devices}
+\label{sub:Devices FreeBSD}
+\par Device drivers in current FreeBSD systems can be categorized into the following three types: disk management, I/O routing and control, and networking \cite{bsd:1}.
+While I/O routing and control is considerably more relevant to our topic and our primary focus, there are still aspects of I/O required/implemented by disk management and networking.
+Disk management specifically caters to the process of organizing the way disks are partitioned and laid-out in a filesystem.
+I/O device drivers handle I/O requests between the device and the system.
+Network device drivers follow the same vein, although the focus of the device is to offer network connection capabilities, it's still crucial to get data off of the device (I/O).
+
+\par Naming schemes and device access needs to be clearly defined and consistent in order to provide a quality experience when interfacing with different devices.
+In the past, FreeBSD would place static nodes into \texttt{/dev} that would provide access to different devices in the system.
+This was soon changed due to several problems including how nodes would persist even if the device was disconnected, admins needed to explicitly create these nodes when devices were added, etc.
+This system was replaced with a dynamic process that takes place upon boot, which finds devices connected to the system and registers their nodes in the \texttt{DEVFS} filesystem \textit{mounted} on \texttt{/dev}.
+Now only mounted devices will show up in \texttt{/dev}.
+The text points out that one advantage of using the old system was the fact that irregular names could be permitted, which allowed for more flexibility \cite{bsd:1}.
+
+\par In FreeBSD there are three kinds of I/O: the character device, filesystem, and socket interface.
+The character interface is best represented as a byte-stream.
+An example of this is a typical keyboard; Information flows sporadically and at different rates depending on user input, but none of the access to it can be parallelized.
+The filesystem refers to disk devices in the system.
+Disk devices typically represent the bulk physical storage for the system and since information can be laid out in any which way the user wants, it needs to have some level of organization for efficient access.
+Finally, the socket interface is part of the network side of things- allowing data to come in over ports for whatever purposes.
+
+\par The text outlines the structure of a device driver as three main subsections- autoconfiguration and initialization routines, routines for servicing I/O requests (top half), and interrupt service routines (bottom half) \cite{bsd:1}.
+Autoconfiguration is a portion of the driver that is responsible for ``probing" the actual hardware device to see if it's ready to handle communication and interactions.
+The actual routines for servicing I/O that are interfaced with by the scheduler are just that- they go through the device and read/write the specified resource depending on the request.
+Finally, the interrupt service routines are equally as obvious a layer.
+They service whatever interrupt is sent to the device in it's own thread, which is a FreeBSD specific design implementation \cite{bsd:1}.
+
+\subsubsection{Interrupts}
+\label{sub:Interrupts FreeBSD}
+\par FreeBSD has systems in place for handling interrupts at either the software or hardware level as well.
+These different situations as described in the text are traps, I/O device interrupts, software interrupts, and clock interrupts \cite{bsd:1}.
+Traps are similar to system calls in the regards to their synchronous executions.
+FreeBSD trap handlers first save the process state, then the handler determines the type of trap to find the correct signal, and finally exits like a system-call handler \cite{bsd:1}.
+
+\par I/O device interrupts stem from I/O device connected to the system through their respective drivers.
+These differ from trap handlers in that they are asynchronous in nature, typically occurring dynamically when resources of interest become available/unavailable.
+I/O interrupt routines are pre-loaded into the kernel's address space.
+The interesting part about interrupt handlers in FreeBSD is that since their asynchronous and occur on demand, they each have their own thread-space, completely isolating them from other handlers and allowing them to be completely discrete \cite{bsd:1}.
+Even though it's possible to block an interrupt while waiting for a particular resource, it's more likely they'll just run to completion since while they're blocking they can't be accessed by other events \cite{bsd:1}.
+
+\par In FreeBSD a software interrupt simply refers to a the mechanism for performing lower-priority processing \cite{bsd:1}.
+Just like hardware-stemming device interrupts, software interrupts have their own context assigned to them.
+This means that priority can fluctuate depending on if they're assigned to a user process or not.
+The process priority hierarchy for handlers from high to low goes as hardware device interrupt, software interrupt, and user process \cite{bsd:1}.
+This means that at each hierarchical level if there are no tasks in the queue that need service, then the next lower will be serviced.
+Interestingly, if a hardware interrupt arrives the scheduler will actually halt any currently running software/user interrupt processes to service the recent hardware interrupt \cite{bsd:1}.
+
+\par Clock interrupts are important to a clock driven system.
+The system will actually receive an interrupt at every regular ``tick" interval, which can be 1000 times per second.
+This is highly inefficient, so FreeBSD implemented a system for predetermining the next required action and schedules an interrupt for that time \cite{bsd:1}.
+The routine \texttt{hardclock()} is the handler for high hardware-interrupt priority clock interrupts.
+Since ticks can be very frequent and occur quickly, it is also imperative that the \texttt{hardclock()} handler is also quick as to not offset and lose time \cite{bsd:1}.
+It's pair \texttt{softclock()} handles lower-priority time operations in an effort to keep calls to \texttt{hardclock()} minimal.
+
+\subsubsection{Memory Management}
+\label{sub:Memory Management FreeBSD}
+\par The current system that FreeBSD has implemented for managing it's virtual memory is called the Mach 2.0 virtual memory system \cite{bsd:1}.
+This choice was made due to it's ``efficient support for sharing and a clean separation of machine-independent and machine-dependent features, as well as multiprocessor support" \cite{bsd:1}.
+Once allocated, FreeBSD divides the address space in virtual memory available to a process into two subsections: kernel and user space.
+The kernel space is at the top of the address space, leaving the remaining bottom portion as user space.
+In 32-bit systems the kernel space is set to 1GB in size and can scale to 2GB, whereas in 64-bit systems the kernel space can usually map to the entirety of physical memory.
+
+\par FreeBSD makes use of the working set model for handling a processes pages \cite{bsd:1}.
+The working set model maintains a record of all of the pages that belong to a process and allows them to be pulled up upon request.
+These pages are then built upon hierarchically with different encapsulating data objects, like files or anonymous pieces of swap space \cite{bsd:1}.
+The lowest-level of these objects, which the physical memory as a page in the virtual system, is the \textit{vm\_page}.
+The structure that contains this data structure and others pertaining to machine-dependent/independent structures that describes the current processes' address space is the \textit{vm\_map}.
+The \textit{vm\_map} structure contains lists of \textit{vm\_map\_entry} structures, which points to a chain of \textit{vm\_object} structures, which ultimately contain references to \textit{vm\_page} descriptors.
+
+\par FreeBSD has access to different allocators for the kernel address space.
+The primary ones are the slab allocator, keg allocator, and the zone allocator \cite{bsd:1}.
+The slab refers to a collection of items that are the same size \cite{bsd:1}.
+Since each slab is a multiple of the page size, this means that it scales directly with the number of objects contained within it.
+The keg allocator exists one level higher and instead encapsulates slabs of equal sizes within them.
+This hierarchy is complete with the zone allocator, which is comprised of sets of kegs.
+
+% @NOTE: SECTION ===============================
+\section{Compared to Linux}
+
+\subsubsection{Processes}
+\label{sub:Process Linux}
+\par Both Windows and BSD view processes the same way as Linux.
+Linux defines a process as a ``program (object code stored on some media) in the midst of execution" \cite{linux:1}.
+In all three operating systems, processes exist in memory address space and are stored in their respective data structures.
+Both FreeBSD and Linux use very similar data structures for storing process information.
+They each have circular lists that store the PID of a process.
+This differs from Windows, in that Windows uses a priority queue that it pops processes threads in and out of as their priorities change and their their turn arrives for CPU time.
+
+\par Whereas Linux and FreeBSD differentiate processes in user and kernel space differently depending on the permission bestowed on execution, Windows handles this separation with entirely different data structures.
+Windows has two different process data structures for user space and kernel space called EPROCESS (executive process) and KPROCESS (kernel process), respectively.
+Another interesting thing about Windows is that it's kernel is built to help the OS as a work-station type operating system, rather than a headless one.
+This is evident by analyzing the W32PROCESS, which is a process that stores information about window and GUI activity on the machine.
+Linux and FreeBSD can both run without this functionality and only after introducing desktop software does it take advantage of its abstract data structures to make a user-friendly GUI a reality.
+
+\subsubsection{Threads}
+\label{sub:Threads Linux}
+\par Just like in FreeBSD, Linux allows the creation of threads within a process in the user space.
+This differs from Windows, where the kernel handles all threads in worker pools and doles them out via API calls.
+Multiprogramming and threads are handled almost the exact same way in FreeBSD and Linux.
+Runnable threads are stored in ``run queues" \cite{bsd:1} \cite{linux:1}, which is interacted with by calls to \textit{runq\_add()} and \textit{runq\_remove} based on priority of the process.
+In linux, forks are almost identical to threads outside of a single flag passed to the \textit{clone()} function.
+This extra flag allows resources to be shared, like the address space, file system resources, file descriptors, and signal handlers \cite{linux:1}.
+FreeBSD tries to mimic this functionality with a call to \textit{pthread\_create()} when it wants a lightweight thread that shares resources.
+Windows handles thread creation in the kernel with a call to \textit{PsCreateSystemThread} and a pointer to that thread is returned.
+
+\par Another major difference between Linux and Windows, is how runnable threads are stored outside of their allotted CPU share.
+Windows implements a priority queue that is maintained by the Windows scheduler.
+Threads placed in the queue are done so after calculating their position based on a number of potentially relevant ``boosts".
+These boosts differ from Linux in how they're several distinct factors for consideration when calculating priority, while Linux primarily focuses on an interactivity score.
+FreeBSD and Linux share this approach by focusing on this interactivity score to provide a smooth user experience.
+This is reflected in their data structure monitored by their scheduler, which is formatted as a linked list.
+
+\subsubsection{CPU Scheduling}
+\label{sub:CPU Scheduling Linux}
+\par The Linux scheduler is called the \textit{Completely Fair Scheduler}.
+Policy is generally dictated outside of the scheduling technology as an after-thought, but the CFS was obviously built with it in mind.
+The goal of this scheduler is to evenly distribute compute time between different processes and threads so that everyone got their fair share \cite{linux:1}.
+The primary exception to this rule is an ``interactivity score", which gives priority to programs with high user interaction to provide a smooth user experience.
+It also takes into account a process' given \textit{nice} score.
+A high nice value says you're willing to surrender cpu time to other processes that need it more, whereas a lower one tells the processor to give you any extra.
+
+\par The Linux scheduler differs from Windows in several ways and FreeBSD's ULE scheduler in less ways (a noticeable pattern).
+One of the things these three operating systems schedulers have in common is they're all preemptive.
+This means the highest priority process will always run.
+Some of the ways the Windows scheduler differs is in it's usage of boosts (covered in subsection \ref{sub:Thread Windows}), the Dispatcher Database data structure, and it's different thread states.
+The dispatcher database is a data structure that tracks which threads are ready and waiting to execute.
+Windows allows for the possibility to have one Dispatcher Database per processor to improve scalability.
+
+\par The Linux kernel places process in 3 different potential states. TASK\_RUNNING, TASK\_INTERRUPTIBLE, or TASK\_UNINTERRUPTIBLE.
+This differs with the Windows Scheduler, in that they've many more states: Init, Ready, Running, Standby, Terminate, Waiting, Transition, and Deferred Ready \cite{win:1}.
+The least obvious of these are the Transition and Deferred Ready.
+Transition state means the thread is ready for execution, but the kernel stack is paged out of memory.
+Once the kernel stack is back in memory, it will go back to being Ready.
+Deferred Ready means this thread was scheduled for a particular processor, but it's currently busy.
+The benefit to this structure is definitely the more descriptive labels for statuses, but it is definitely less abstract than the Linux/FreeBSD implementation.
+
+\subsubsection{I/O Scheduling}
+\label{sub:IOScheduling Linux}
+\par We've seen how I/O scheduling in Windows is handled by a request manager and is abstracted out into a stack in FreeBSD, but Linux has it's own way of handling I/O scheduling.
+The Linux kernel actually has a specific I/O scheduler, which works by managing a block device's request queue \cite{linux:1}.
+The I/O scheduler is similar to the process scheduler in that it virtualizes block devices across outstanding I/O requests.
+This scheduler is built on top of the device and has it's own algorithms for deciding what packets get served and when.
+Linux provides different options for I/O schedulers on top of it's block device, among these choices are: anticipatory, deadline, completely fair, and noop schedulers.
+
+\par The anticipatory scheduler introduces a new heuristic for warding off seek-storms, by waiting a brief moment after each operation in case there will be another request to the immediate area.
+This was built on top of the deadline scheduler, which didn't have this functionality and instead had a expiration time on each request to prevent starvation.
+This was an okay approach, but could lead to messy seek process.
+In the completely fair scheduler I/O request priority is based off of the calling process's priority.
+This plays more into the ``fairness" aspect of Linux.
+Finally, the noop scheduler caters to a specialized, but different approach.
+It doesn't provide anything fancy and caters to systems that have truly randomized block storage, where fancy merging isn't quite necessary.
+
+\par In the reading, Linux and FreeBSD both mention block and character devices.
+They both recognize the importance of being able to schedule requests in a way that cater to the primary purpose of the machine- whether it's for batch jobs or user experience.
+However, whereas Windows has a singular abstraction level for handling a majority of I/O request functionality away from the individual devices, each device in Linux and FreeBSD actually has their own.
+So the primary scheduler for processes just allow the drivers their time they need on the CPU to actually communicate from the device to the system.
+
+\par A fundamental system functionality shared between Linux, Windows, and FreeBSD is the process of servicing I/O requests through request queues.
+While they aren't all implemented in the same way, they each have mention and use them to fulfill the same purpose- efficiently handling information communication between devices \cite{bsd:1} \cite{win:2} \cite{linux:1}.
+In Linux specifically, request queues servicing block I/O layers can be found in \texttt{<linux/blkdev.h>}.
+They are a doubly linked list filled with the necessary information to provide a successful request.
+
+\subsubsection{Devices}
+\label{sub:Devices Linux}
+\par As mentioned prior within FreeBSD's device subsection, all Unix systems have three classes of devices: block, character, and network.
+Since our focus for this chapter is on block devices, we'll hone in on the block device modules.
+Users are familiar with the description of Linux being ``monolithic" \cite{linux:1}, but that's only in the sense of the address space.
+This contrasts with the fact that Linux is actually very modular- meaning it supports dynamic insertion/removal of code.
+While users can design and develop their own modules or libraries for the Linux kernel, we'll focus on the device models specifically.
+
+\par The device model is a new feature that was introduced in version 2.6.
+It was introduced in an effort towards a unified \textit{device model} \cite{linux:1}.
+This functionality provides a few primary benefits like (among others):
+\begin{list}{-}{}
+\item minimization duplicated code
+\item to provide common facilities
+\item capability to link to other devices
+\item etc.
+\end{list}
+This methodology is shared in philosophy with Windows and FreeBSD, but their implementations are very different.
+Linux has set data structures that are expecting to be interfaced with appropriately with the devices themselves.
+The layout of the data structure for \texttt{struct kobject} is very telling (figure \ref{code:kobject_struct})
+
+\begin{figure}[h]
+\begin{lstlisting}
+struct kobject {
+        const char              *name;
+        struct list_head        entry;
+        struct kobject          *parent;
+        struct kset             state_initialized:1;
+        struct kobj_type        *kset;
+        struct sysfs_dirent     *ktype;
+        struct kref             *sd;
+        unsigned int            kref;
+        unsigned int            state_in_sysfs:1;
+        unsigned int            state_add_uevent_sent:1;
+        unsigned int            state_remove_uevent_sent:1;
+        unsigned int            uevent_suppress:1;
+};
+
+struct cdev {
+        struct kobject                  kobj;
+        struct module                   *owner;
+        const struct file_operations    *ops;
+        struct list_head                list;
+        dev_t                           dev;
+        unsigned int                    count;
+};
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  The \texttt{kobject} structure provides basic facilities such as a name, a pointer to it's location in sysfs, and a counter.
+  A more interesting structure is the \texttt{cdev} structure.
+  once a \texttt{kobject} is included in the \texttt{cdev} structure, it gains all of it's standardized functions and can become part of an object hierarchy.
+}
+\label{code:kobject_struct}
+\end{figure}
+
+\par The important key to understanding how devices work in Linux is the \texttt{kobject} structure.
+It introduces basic object properties in a standard and unified way.
+They are often times just embedded in other objects, like the \texttt{ksets} sets for aggregational purposes.
+This is a highlighted difference between Linux and FreeBSD/Windows.
+While Windows is very particular about being consistent across devices that interact with its kernel, it doesn't go as far as to define abstract objects and whatever else to interface with those devices.
+Windows does however provide common faculties for use across different devices, but never to that extent.
+
+\par Finally, at the highest level exists the sysfs filesystem.
+the sysfs filesystem is an all in-memory filesystem that provides a topdown view of the entire hierarchy of \texttt{kobject}s \cite{linux:1}.
+Taking advantage of the attributes exposed by the \texttt{kobject}s, the kernel variables can now read/from write to these devices.
+Both FreeBSD and Windows have methods in which they keep track of their existing/running drivers.
+This is an essential part of managing many devices that are all connected to the system, but the sysfs is distinct and interesting due to its layered approach within the Linux system.
+embedding objects into objects over and over is an interesting way to expose functionality to higher levels while keeping references nice and clean.
+
+\subsubsection{Interrupts}
+\label{sub:Interrupts Linux}
+\par Outside of a few subtle differences, Linux shares the same approach towards interrupts and interrupt handlers as FreeBSD and Windows.
+Interrupts are a simple idea and since every operating system strives to achieve them in the most efficient manner, they're bound to agree somewhere in implementation.
+Whether it be hardware interrupts, software interrupts, or trap handlers these three kernels seem to agree in a lot of areas.
+Interesting areas of specific differences are FreeBSD priority queue for handler process tasks and Windows IDT handler look up table \cite{bsd:1} \cite{win:1}.
+
+\par Like in FreeBSD and for some interrupts in Windows, the Linux kernel runs the required interrupt handler in response to the interrupt received.
+Interrupt handlers are implemented through C Code and are tethered to their specific prototype for the Kernel to reference, but in the end they are just regular functions \cite{linux:1}.
+The functionality that both differentiates interrupt handler threads from other system threads and both Windows \& FreeBSD kernels is that they're assigned their own unique context, called the \textit{interrupt context}.
+The text mentions that this context can be referred to as an \textit{atomic} context, because it cannot block \cite{linux:1}.
+This is a highlighted difference between Linux and FreeBSD, because FreeBSD can allow interrupt handlers to block if necessary (see Section \ref{sub:Interrupts FreeBSD}).
+
+\par To highlight the fact that Linux requires it's handlers be lightweight and efficient, in an approach also shared by Windows and FreeBSD, it's useful to see an example of a handler being called by the kernel in Figure \ref{code:linux_handler}.
+All three kernels (Windows, FreeBSD, and Linux) strive to be as fast and efficient as possible when handling interrupts from any source.
+This means writing clean and abstract code that promotes consistency and reusability.
+While this can be hard to implement 100\% of the time when in development, we can see this in practice with real-time clock (RTC) handler, which is only about 40 lines of code.
+We discussed earlier in the FreeBSD subsection how important this interrupt handler is and it's requirements of being very quick.
+
+
+\begin{figure}[h]
+\begin{lstlisting}
+  if (request_irq(irqn, my_interrupt, IRQF_SHARED, "my_device", my_dev)) {
+          printk(KERN_ERR "my_device: cannot register IRQ %d\n", irqn);
+          return -EIO;
+  }
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  An example of the Linux kernel calling the interrupt handler and wrapping it in a conditional based on whether or not the call was successful.
+  to break the call down you can see that \texttt{irqn} is the actual interrupt line, \texttt{my\_interrupt} refers to the handler, \texttt{IRQF\_SHARED} is the flag that tells the handler the line is to be shared, followed by the name of the device, and finally \texttt{my\_dev} replaces the \texttt{dev} parameter.
+}
+\label{code:linux_handler}
+\end{figure}
+
+\subsubsection{Memory Management}
+\label{sub:Memory Management Linux}
+\par Memory management in the Linux kernel follows a lot of the same principles that we've covered in the Windows and FreeBSD subsections.
+Of the two, however, Linux and Windows have some of the most highlighted differences.
+While the high-level goal of managing and allocating virtual memory over the physical space in the kernel is shared by the three operating systems, they contrast in some interesting areas.
+The main things we're looking at are areas such as data structures, paging, and address structure.
+
+\par Linux's data structures for memory management are implemented in the form of a linked-list \cite{linux:1}.
+This approach is shared by FreeBSD, but contrasted by Windows, which as we covered in subsection \ref{sub:Memory Management Windows} makes use of a tree data structure.
+Whenever the system requests a particular page, it parses over the linked list containing \texttt{vm\_area} structs and locates it.
+What's interesting, however, is that if this list structure reaches a certain size Linux will convert the abstract structure to a tree instead for scalability \cite{linux:1}.
+
+\begin{figure}[h]
+\begin{lstlisting}
+  char *buf;
+
+  buf = vmalloc(16 * PAGE_SIZE); /* get 16 pages */
+
+  if (!buf)
+    /* error! failed to allocate memory */
+
+  vfree(buf);
+\end{lstlisting}
+\centering
+\captionsetup{justification=centering}
+\caption{
+  \texttt{vmalloc} is a similar function to \texttt{kmalloc}, but it's used for allocating memory that is only \textit{virtually} contiguous.
+  Above is an example of how to generate a buffer that points to a virtually contiguous block of memory.
+}
+\label{code:vmalloc}
+\end{figure}
+
+\par Like FreeBSD, Linux also has 1GB allocated for kernel mode and 3GB allocated for user mode in memory space.
+Unlike Windows, Linux uses purely demand paging with no pre-paging \cite{linux:1}.
+This is called a ``lazy" system, because it will services page requests and swaps as they come in, rather than taking any initiative.
+Linux pages have an address that is comprised of four parts: the global directory, middle directory, page table, and offset \cite{linux:1}.
+This is a different system from Windows, which makes use of only two things for it's address structure (page number \& offset).
+
+% @NOTE: SECTION ===============================
+\section{Conclusion}
+\par After digging into to the inner-workings and interesting design implementations for kernel functionality within the operating systems for Windows, FreeBSD, and Linux it provides excellent context for continued development at the kernel level.
+In certain areas these operating systems differ largely in implementation while, at a high-level, meeting the same goal.
+Windows tends to take a ``not invented here" approach to much of it's interfacing requirements and is very proprietary in that regard.
+This allows it to be a very efficient and safe system at times, but this limitation is highlighted when compared to operating systems like FreeBSD and Linux, which allow the user to introduce almost whatever technology to the system that they desire.
+Prior to taking this course I was very apprehensive to delve into such low-level code, but the assignments based around introducing kernel functionality to the Linux kernel and researching the differences between it and Windows/FreeBSD has done a lot to alleviate that feeling.
+
+% @NOTE: SECTION ===============================
+\section{Assignment Appendix - Writing 1}
+\input{paper1.tex}
+
+% @NOTE: SECTION ===============================
+\section{Assignment Appendix - Writing 2}
+\input{paper2.tex}
+
+% @NOTE: SECTION ===============================
+\section{Assignment Appendix - Writing 3}
+\input{paper3.tex}
+
+% @NOTE: SECTION ===============================
+\section{Assignment Appendix - Writing 4}
+\input{paper4.tex}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

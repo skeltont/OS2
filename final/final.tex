@@ -4,9 +4,35 @@
 \usepackage{listings}
 \usepackage{cite}
 \usepackage{caption}
+\usepackage{color}
 
-% set syntax highlighting for listings
-\lstset{language=C}
+% @NOTE: revisions:
+% -[x] add colors to code listings
+% -[x] remove redundant sentences
+% -[x] reformat paper
+% -[x] fix quote and other in-line syntax
+% -[x] clean up section spacing for readability
+
+% @TODO:
+% - [x] prep for turn in
+
+% set syntax highlighting for listings NOW WITH COLORS
+% \lstset{language=C}
+\definecolor{bluekeywords}{rgb}{0.13,0.13,1}
+\definecolor{greencomments}{rgb}{0,0.5,0}
+\definecolor{redstrings}{rgb}{0.9,0,0}
+\lstset{language=C,
+  showspaces=false,
+  showtabs=false,
+  breaklines=true,
+  showstringspaces=false,
+  breakatwhitespace=true,
+  escapeinside={(*@}{@*)},
+  commentstyle=\color{greencomments},
+  keywordstyle=\color{bluekeywords},
+  stringstyle=\color{redstrings},
+  basicstyle=\ttfamily
+}
 \lstset{frame=lrbt,xleftmargin=\fboxsep,xrightmargin=-\fboxsep}
 
 % correct bad hyphenation here
@@ -61,7 +87,7 @@ We'll cover exciting topics like process behavior, CPU scheduling, device interf
 
 \subsubsection{Processes}
 \label{sub:Process Windows}
-\par Windows processes are also defined as programs in execution.
+\par Windows processes, like any other, are defined as programs in execution.
 The standard data structure for a Windows process is called an EPROCESS.
 Windows tracks running processes with the Process Executive Object Manager.
 It does so by encapsulating the process in a ``process object" \cite{win:1}.
@@ -75,7 +101,7 @@ The most obvious of these being KPROCESS, which is a kernel process.
 As the name implies, these are only accessible from kernel mode.
 These are the only kind of processes running at the kernel level.
 CSR\_PROCESS contains info specific to the Windows subsystem (Csrss - Client/Server Run-time Subsystem).
-W32PROCESS is a very important kernel level process, because it tracks all pertinent information regarding the window management code and GUI processes.
+W32PROCESS is a very important kernel level process, because it tracks all pertinent information regarding the window management code and GUI processes.\\
 
 \subsubsection{Threads}
 \label{sub:Thread Windows}
@@ -93,7 +119,7 @@ Basically, this means that when something a thread is waiting on occurs or hasn'
 
 \par Thread pools are a mechanism that Windows recently transitioned from being a user implemented tool to being completely managed by the kernel.
 This change is due to the fact that the kernel allowed to directly manipulate thread creation, scheduling, and termination \cite{win:1}.
-This allows the users program code to generate a worker pool through a simple API call, rather than managing virtual memory.
+This allows the users program code to generate a worker pool through a simple API call, rather than managing virtual memory.\\
 
 \subsubsection{CPU Scheduling}
 \label{sub:CPU Scheduling Windows}
@@ -110,7 +136,7 @@ Threads that are set to be executed are queued up by priority.
 The ready threads in the queue are stored in a data structure called the Dispatcher Database.
 When it's time to pop a thread out of the queue, it's set to a ``running" state and stays that way for its reserved quantum of execution.
 When the its share of CPU is up, then it will go back into the queue.
-Since this queue is based on priority, it's important that no threads get starved and this is accomplished via the ``boosting" technique covered in subsection \ref{sub:Thread Windows}.
+Since this queue is based on priority, it's important that no threads get starved and this is accomplished via the ``boosting" technique covered in subsection \ref{sub:Thread Windows}.\\
 
 \subsubsection{I/O Scheduling}
 \label{sub:IOScheduling Windows}
@@ -139,7 +165,7 @@ This requires that the file is currently opened for non-cached I/O, the buffers 
 \par The Plug and Play (PnP) manager is ``the primary component involved in supporting the ability of Windows to recognize and adapt to changing hardware configurations" \cite{win:2}.
 This is to prevent the user having to be able to understand the complex details of managing installing and removing devices from their system.
 An example from the text relays how it's the PnP manager that would allow a system user on a windows laptop to place it into a docking station, detect the devices it's connected to, and then make them available \cite{win:2}.
-This is a very powerful tool and is something that makes Windows very appealing to all desktop users.
+This is a very powerful tool and is something that makes Windows very appealing to all desktop users.\\
 
 \subsubsection{Devices}
 \label{sub:Devices Windows}
@@ -174,7 +200,7 @@ Port drivers handle all processing to a type of port.
 These are almost always created and maintained by Microsoft so that they can keep them standardized.
 
 \begin{figure}[h]
-\begin{lstlisting}
+\begin{lstlisting}[language=C]
  lkd> !drvobj \Driver\kbdclass 7
  Driver object (fffffa800adc2e70) is for:
   \Driver\kbdclass
@@ -214,7 +240,7 @@ Dispatch routines serve as the primary entry points for a device driver, as show
 The start I/O routine is used for initiating I/O transfer, but is only used in routines that require the I/O manager to queue their requests.
 The interrupt service routine is the handler for whenever a device interrupts; The kernel's interrupt dispatcher transfers control to this service when the relevant interrupt happens.
 Finally, the DPC routine is what does most of the work after the interrupt is handled.
-After completing an I/O process it will then queue the next I/O operation.
+After completing an I/O process it will then queue the next I/O operation.\\
 
 \subsubsection{Interrupts}
 \label{sub:Interrupts Windows}
@@ -239,7 +265,7 @@ After a successful lookup to the IDT, control is passed to the corresponding int
 Not only does it map hardware IRQs to IDT numbers, but it even has entries for trap handlers for exceptions \cite{win:1}.
 An example of this functionality is provided by the text cited in this paper, which describes the entry for the x86 and x64 exception number for a page fault \cite{win:1}.
 The main takeaway for this tooling in the Windows kernel system for interrupts is that not only can it's interrupt routine lookup-table capable of relaying mappings for hardware originating interrupts, but also from software (exceptions).
-An example of this table's structure is provided in Figure \ref{code:idt_sample}
+An example of this table's structure is provided in Figure \ref{code:idt_sample}\\
 
 \begin{figure}[h]
 \begin{lstlisting}
@@ -328,7 +354,7 @@ This data structure, however, can be allocated to and freed from memory dynamica
 A running process will only track two PIDs- that of its parent and its own.
 This is stored in the process structure, along with information like: signal state, process tracing information, and timers (both real and CPU-utilization).
 These processes are then filtered into two lists, \textit{zombproc} for ``dead" processes and \textit{allproc} for ``live" ones.
-This functionality is meant for cutting down the amount of work the \textit{wait} system call has to do, along with how many things the scheduler has to scan \cite{bsd:1}.
+This functionality is meant for cutting down the amount of work the \textit{wait} system call has to do, along with how many things the scheduler has to scan \cite{bsd:1}.\\
 
 \subsubsection{Threads}
 \label{sub:Thread FreeBSD}
@@ -342,7 +368,7 @@ Threads require an address space and other resources, but the resources provided
 \par Threads are able to execute in either \textit{user mode} or \textit{kernel mode}.
 User mode executes the program with a lower set of permissions and less access to the hardware and the kernel's internal functions.
 Kernel mode is the opposite, where it is executed with heightened permissions and a potential shoot-yourself-in-the foot level of access to the hardware and kernel resources.
-By default, threads within FreeBSD share all of the resources of their calling process, including the PID.
+By default, threads within FreeBSD share all of the resources of their calling process, including the PID.\\
 
 \subsubsection{CPU Scheduling}
 \label{sub:CPU Scheduling FreeBSD}
@@ -362,7 +388,7 @@ This means that the cpu will attempt to handle any computation requested user in
 
 \par Scheduling in FreeBSD is broken down into two parts: a simpler low-level scheduler that runs very often and a more powerful high-level scheduler that runs only a couple times per second \cite{bsd:1}.
 The low-level scheduler handles whenever processes or threads block and another needs to be ran.
-To simplify the decision making process for which goes when, the kernel keeps track of a run queue for each CPU sorted by priority.
+To simplify the decision making process for which goes when, the kernel keeps track of a run queue for each CPU sorted by priority.\\
 
 \subsubsection{I/O Scheduling}
 \label{sub:IOScheduling FreeBSD}
@@ -388,7 +414,7 @@ This means that the peripheral sublayer handles building I/O specific commands s
 The CAM Transport Layer (XPT) is responsible for scheduling and dispatching I/O commands.
 It's the focal point between all of the peripherals and their adapters.
 Finally, the CAM SIM layer (Software Interface Module) handles routing to the actual devices.
-This layer is adjacent to the device layer, where it will allocate paths to the request device and collect all relevant notifications.
+This layer is adjacent to the device layer, where it will allocate paths to the request device and collect all relevant notifications.\\
 
 \subsubsection{Devices}
 \label{sub:Devices FreeBSD}
@@ -416,7 +442,7 @@ Finally, the socket interface is part of the network side of things- allowing da
 Autoconfiguration is a portion of the driver that is responsible for ``probing" the actual hardware device to see if it's ready to handle communication and interactions.
 The actual routines for servicing I/O that are interfaced with by the scheduler are just that- they go through the device and read/write the specified resource depending on the request.
 Finally, the interrupt service routines are equally as obvious a layer.
-They service whatever interrupt is sent to the device in it's own thread, which is a FreeBSD specific design implementation \cite{bsd:1}.
+They service whatever interrupt is sent to the device in it's own thread, which is a FreeBSD specific design implementation \cite{bsd:1}.\\
 
 \subsubsection{Interrupts}
 \label{sub:Interrupts FreeBSD}
@@ -443,7 +469,7 @@ The system will actually receive an interrupt at every regular ``tick" interval,
 This is highly inefficient, so FreeBSD implemented a system for predetermining the next required action and schedules an interrupt for that time \cite{bsd:1}.
 The routine \texttt{hardclock()} is the handler for high hardware-interrupt priority clock interrupts.
 Since ticks can be very frequent and occur quickly, it is also imperative that the \texttt{hardclock()} handler is also quick as to not offset and lose time \cite{bsd:1}.
-It's pair \texttt{softclock()} handles lower-priority time operations in an effort to keep calls to \texttt{hardclock()} minimal.
+It's pair \texttt{softclock()} handles lower-priority time operations in an effort to keep calls to \texttt{hardclock()} minimal.\\
 
 \subsubsection{Memory Management}
 \label{sub:Memory Management FreeBSD}
@@ -465,7 +491,7 @@ The primary ones are the slab allocator, keg allocator, and the zone allocator \
 The slab refers to a collection of items that are the same size \cite{bsd:1}.
 Since each slab is a multiple of the page size, this means that it scales directly with the number of objects contained within it.
 The keg allocator exists one level higher and instead encapsulates slabs of equal sizes within them.
-This hierarchy is complete with the zone allocator, which is comprised of sets of kegs.
+This hierarchy is complete with the zone allocator, which is comprised of sets of kegs.\\
 
 % @NOTE: SECTION ===============================
 \section{Compared to Linux}
@@ -483,7 +509,7 @@ This differs from Windows, in that Windows uses a priority queue that it pops pr
 Windows has two different process data structures for user space and kernel space called EPROCESS (executive process) and KPROCESS (kernel process), respectively.
 Another interesting thing about Windows is that it's kernel is built to help the OS as a work-station type operating system, rather than a headless one.
 This is evident by analyzing the W32PROCESS, which is a process that stores information about window and GUI activity on the machine.
-Linux and FreeBSD can both run without this functionality and only after introducing desktop software does it take advantage of its abstract data structures to make a user-friendly GUI a reality.
+Linux and FreeBSD can both run without this functionality and only after introducing desktop software does it take advantage of its abstract data structures to make a user-friendly GUI a reality.\\
 
 \subsubsection{Threads}
 \label{sub:Threads Linux}
@@ -501,7 +527,7 @@ Windows implements a priority queue that is maintained by the Windows scheduler.
 Threads placed in the queue are done so after calculating their position based on a number of potentially relevant ``boosts".
 These boosts differ from Linux in how they're several distinct factors for consideration when calculating priority, while Linux primarily focuses on an interactivity score.
 FreeBSD and Linux share this approach by focusing on this interactivity score to provide a smooth user experience.
-This is reflected in their data structure monitored by their scheduler, which is formatted as a linked list.
+This is reflected in their data structure monitored by their scheduler, which is formatted as a linked list.\\
 
 \subsubsection{CPU Scheduling}
 \label{sub:CPU Scheduling Linux}
@@ -525,7 +551,7 @@ The least obvious of these are the Transition and Deferred Ready.
 Transition state means the thread is ready for execution, but the kernel stack is paged out of memory.
 Once the kernel stack is back in memory, it will go back to being Ready.
 Deferred Ready means this thread was scheduled for a particular processor, but it's currently busy.
-The benefit to this structure is definitely the more descriptive labels for statuses, but it is definitely less abstract than the Linux/FreeBSD implementation.
+The benefit to this structure is definitely the more descriptive labels for statuses, but it is definitely less abstract than the Linux/FreeBSD implementation.\\
 
 \subsubsection{I/O Scheduling}
 \label{sub:IOScheduling Linux}
@@ -551,7 +577,7 @@ So the primary scheduler for processes just allow the drivers their time they ne
 \par A fundamental system functionality shared between Linux, Windows, and FreeBSD is the process of servicing I/O requests through request queues.
 While they aren't all implemented in the same way, they each have mention and use them to fulfill the same purpose- efficiently handling information communication between devices \cite{bsd:1} \cite{win:2} \cite{linux:1}.
 In Linux specifically, request queues servicing block I/O layers can be found in \texttt{<linux/blkdev.h>}.
-They are a doubly linked list filled with the necessary information to provide a successful request.
+They are a doubly linked list filled with the necessary information to provide a successful request.\\
 
 \subsubsection{Devices}
 \label{sub:Devices Linux}
@@ -622,7 +648,7 @@ the sysfs filesystem is an all in-memory filesystem that provides a topdown view
 Taking advantage of the attributes exposed by the \texttt{kobject}s, the kernel variables can now read/from write to these devices.
 Both FreeBSD and Windows have methods in which they keep track of their existing/running drivers.
 This is an essential part of managing many devices that are all connected to the system, but the sysfs is distinct and interesting due to its layered approach within the Linux system.
-embedding objects into objects over and over is an interesting way to expose functionality to higher levels while keeping references nice and clean.
+embedding objects into objects over and over is an interesting way to expose functionality to higher levels while keeping references nice and clean.\\
 
 \subsubsection{Interrupts}
 \label{sub:Interrupts Linux}
@@ -641,8 +667,7 @@ This is a highlighted difference between Linux and FreeBSD, because FreeBSD can 
 All three kernels (Windows, FreeBSD, and Linux) strive to be as fast and efficient as possible when handling interrupts from any source.
 This means writing clean and abstract code that promotes consistency and reusability.
 While this can be hard to implement 100\% of the time when in development, we can see this in practice with real-time clock (RTC) handler, which is only about 40 lines of code.
-We discussed earlier in the FreeBSD subsection how important this interrupt handler is and it's requirements of being very quick.
-
+We discussed earlier in the FreeBSD subsection how important this interrupt handler is and it's requirements of being very quick.\\
 
 \begin{figure}[h]
 \begin{lstlisting}

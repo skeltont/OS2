@@ -1,5 +1,6 @@
 doc = final
 assignment = final
+extras = paper
 
 default: all
 
@@ -23,10 +24,7 @@ clean:
 	rm -f *.toc
 
 testlocal:
-	python testdoc.py
-#
-# testremote:
-# 	/usr/local/apps/python/python-3.5.1 testdoc.py
+		python testdoc.py
 
 tar:
-	tar cvjf CS444_$(assignment)_118.tar.bz2 IEEEtran.cls IEEEtran.bst makefile $(doc).tex references.bib
+	tar cvjf CS444_$(assignment)_118.tar.bz2 IEEEtran.cls IEEEtran.bst makefile $(doc).tex $(extras)*.tex references.bib
